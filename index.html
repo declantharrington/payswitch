@@ -798,78 +798,124 @@
 </footer>
 
 <script>
-const FRAME_DATA = [];
-
-// Frame-by-frame scroll images have been removed from this HTML file.
-// To reconnect externally hosted frames later, replace the empty array above with something like:
-// const FRAME_DATA = Array.from({ length: 160 }, (_, i) =>
-//   `/frames/terminal_${String(i + 1).padStart(4, '0')}.webp`
-// );
-
+// ─── FRAME SOURCE LOGIC ─────────────────────────────────────
+// These are your 160 externally hosted JPG frames in Vercel's /public/frames folder.
+// GitHub/Vercel file path:
+//   public/frames/ezgif-frame-001.jpg
+// Browser URL path:
+//   /frames/ezgif-frame-001.jpg
+const FRAME_DATA = Array.from({ length: 160 }, (_, i) =>
+  `/frames/ezgif-frame-${String(i + 1).padStart(3, '0')}.jpg`
+);
 
 // ─── CANVAS SETUP ───────────────────────────────────────────
 const canvas = document.getElementById('terminal-canvas');
 const ctx = canvas.getContext('2d');
-const TOTAL_FRAMES = FRAME_DATA.length || 160;
+const TOTAL_FRAMES = FRAME_DATA.length;
 const FRAME_WIDTH = 1280;
 const FRAME_HEIGHT = 720;
 
 canvas.width = FRAME_WIDTH;
 canvas.height = FRAME_HEIGHT;
 
-// ─── PRELOAD ────────────────────────────────────────────────
+// ─── LOADER / PRELOAD ───────────────────────────────────────
 const images = new Array(TOTAL_FRAMES);
 let loadedCount = 0;
+let failedCount = 0;
 let allLoaded = false;
+let loaderHidden = false;
+
 const loaderBar = document.getElementById('loaderBar');
 const loaderPct = document.getElementById('loaderPct');
 const loader = document.getElementById('loader');
 
-function onImageLoad() {
-  loadedCount++;
-  const pct = Math.round((loadedCount / TOTAL_FRAMES) * 100);
-  loaderBar.style.width = pct + '%';
-  loaderPct.textContent = 'Loading experience — ' + pct + '%';
+function updateLoaderProgress() {
+  const completed = loadedCount + failedCount;
+  const pct = TOTAL_FRAMES > 0 ? Math.round((completed / TOTAL_FRAMES) * 100) : 100;
 
-  if (loadedCount === TOTAL_FRAMES) {
-    allLoaded = true;
-    // Draw first frame immediately
-    ctx.drawImage(images[0], 0, 0);
-    // Small delay for polish then hide loader
-    setTimeout(() => {
-      loader.classList.add('hidden');
-    }, 400);
+  if (loaderBar) loaderBar.style.width = pct + '%';
+  if (loaderPct) {
+    loaderPct.textContent = failedCount > 0
+      ? `Loading experience — ${pct}% (${failedCount} frame${failedCount === 1 ? '' : 's'} skipped)`
+      : `Loading experience — ${pct}%`;
   }
 }
 
-// Stagger loads slightly to avoid browser blocking.
-// If FRAME_DATA is empty, skip image preloading and show a lightweight placeholder.
-if (FRAME_DATA.length > 0) {
-  FRAME_DATA.forEach((src, i) => {
-    const img = new Image();
-    img.onload = onImageLoad;
-    img.onerror = onImageLoad; // count errors too
-    img.src = src;
-    images[i] = img;
-  });
-} else {
+function hideLoader() {
+  if (loaderHidden) return;
+  loaderHidden = true;
   allLoaded = true;
-  loaderBar.style.width = '100%';
-  loaderPct.textContent = 'Frame images removed';
 
+  updateLoaderProgress();
+
+  // Draw the first available frame before hiding the loader.
+  const firstAvailableIndex = images.findIndex(img => img && img.dataset && img.dataset.loaded === 'true');
+  if (firstAvailableIndex >= 0) {
+    drawFrame(firstAvailableIndex, true);
+  } else {
+    drawPlaceholder('Frame images could not be loaded', 'Check that /frames/ezgif-frame-001.jpg opens in your browser.');
+  }
+
+  setTimeout(() => {
+    if (loader) loader.classList.add('hidden');
+  }, 350);
+}
+
+function markFrameComplete(img, ok) {
+  if (ok) {
+    loadedCount++;
+    img.dataset.loaded = 'true';
+  } else {
+    failedCount++;
+    img.dataset.loaded = 'false';
+  }
+
+  updateLoaderProgress();
+
+  if (loadedCount + failedCount >= TOTAL_FRAMES) {
+    hideLoader();
+  }
+}
+
+function drawPlaceholder(title, subtitle) {
   ctx.fillStyle = '#020408';
   ctx.fillRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
   ctx.font = '500 28px Inter, sans-serif';
   ctx.fillStyle = 'rgba(240,244,255,0.7)';
   ctx.textAlign = 'center';
-  ctx.fillText('Frame sequence removed', FRAME_WIDTH / 2, FRAME_HEIGHT / 2 - 12);
+  ctx.fillText(title, FRAME_WIDTH / 2, FRAME_HEIGHT / 2 - 12);
   ctx.font = '400 16px Inter, sans-serif';
   ctx.fillStyle = 'rgba(200,210,240,0.45)';
-  ctx.fillText('Add external /frames assets later to restore the scroll animation', FRAME_WIDTH / 2, FRAME_HEIGHT / 2 + 24);
+  ctx.fillText(subtitle, FRAME_WIDTH / 2, FRAME_HEIGHT / 2 + 24);
+}
 
+if (TOTAL_FRAMES > 0) {
+  FRAME_DATA.forEach((src, i) => {
+    const img = new Image();
+    img.dataset.loaded = 'pending';
+
+    img.onload = () => markFrameComplete(img, true);
+    img.onerror = () => {
+      console.warn(`Frame failed to load: ${src}`);
+      markFrameComplete(img, false);
+    };
+
+    img.src = src;
+    images[i] = img;
+  });
+
+  // Safety fallback: never let the loader stay up forever.
+  // This is useful if Vercel is still deploying, a path is wrong, or a browser stalls on an image request.
   setTimeout(() => {
-    loader.classList.add('hidden');
-  }, 400);
+    if (!loaderHidden) {
+      console.warn('Loader fallback triggered before every frame finished loading.');
+      hideLoader();
+    }
+  }, 12000);
+} else {
+  updateLoaderProgress();
+  drawPlaceholder('Frame sequence removed', 'Add external /frames assets to restore the scroll animation.');
+  hideLoader();
 }
 
 // ─── SCROLL ANIMATION ───────────────────────────────────────
@@ -883,28 +929,45 @@ let rafId = null;
 let lastDrawnFrame = -1;
 
 function getScrollProgress() {
-  const rect = scrollSection.getBoundingClientRect();
   const sectionTop = scrollSection.offsetTop;
-  const sectionHeight = scrollSection.offsetHeight - window.innerHeight;
+  const sectionHeight = Math.max(1, scrollSection.offsetHeight - window.innerHeight);
   const scrollY = window.scrollY;
-  const progress = Math.max(0, Math.min(1, (scrollY - sectionTop) / sectionHeight));
-  return progress;
+  return Math.max(0, Math.min(1, (scrollY - sectionTop) / sectionHeight));
 }
 
-function drawFrame(frameIndex) {
-  if (!allLoaded) return;
-  const img = images[frameIndex];
-  if (!img || !img.complete) return;
-  if (frameIndex === lastDrawnFrame) return;
+function findNearestLoadedFrame(frameIndex) {
+  if (images[frameIndex] && images[frameIndex].dataset.loaded === 'true') return frameIndex;
 
-  // Cinematic: slight vignette composite
-  ctx.clearRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-  ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-  lastDrawnFrame = frameIndex;
+  for (let offset = 1; offset < TOTAL_FRAMES; offset++) {
+    const back = frameIndex - offset;
+    const forward = frameIndex + offset;
 
-  // Update badge
-  const frameNum = String(frameIndex + 1).padStart(3, '0');
-  frameBadge.textContent = 'FRAME ' + frameNum + ' / 160';
+    if (back >= 0 && images[back] && images[back].dataset.loaded === 'true') return back;
+    if (forward < TOTAL_FRAMES && images[forward] && images[forward].dataset.loaded === 'true') return forward;
+  }
+
+  return -1;
+}
+
+function drawFrame(frameIndex, force = false) {
+  if (!allLoaded && !force) return;
+
+  const usableFrameIndex = findNearestLoadedFrame(frameIndex);
+  if (usableFrameIndex < 0) return;
+  if (!force && usableFrameIndex === lastDrawnFrame) return;
+
+  const img = images[usableFrameIndex];
+
+  try {
+    ctx.clearRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+    ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+    lastDrawnFrame = usableFrameIndex;
+
+    const frameNum = String(usableFrameIndex + 1).padStart(3, '0');
+    if (frameBadge) frameBadge.textContent = 'FRAME ' + frameNum + ' / ' + TOTAL_FRAMES;
+  } catch (error) {
+    console.warn('Could not draw frame:', usableFrameIndex + 1, error);
+  }
 }
 
 function lerp(a, b, t) {
@@ -914,7 +977,6 @@ function lerp(a, b, t) {
 function animate() {
   rafId = requestAnimationFrame(animate);
 
-  // Smooth lerp toward target
   const easedFrame = lerp(currentFrame, targetFrame, 0.18);
   currentFrame = easedFrame;
 
@@ -928,16 +990,12 @@ window.addEventListener('scroll', () => {
   const progress = getScrollProgress();
   targetFrame = progress * (TOTAL_FRAMES - 1);
 
-  // Update progress bar
-  scrollFill.style.height = (progress * 100) + '%';
-
+  if (scrollFill) scrollFill.style.height = (progress * 100) + '%';
 }, { passive: true });
 
-// Start animation loop
 animate();
 
 // ─── PARALLAX SUBTLETY ──────────────────────────────────────
-// Subtle depth shift on mouse move
 document.addEventListener('mousemove', (e) => {
   const cx = window.innerWidth / 2;
   const cy = window.innerHeight / 2;
@@ -946,7 +1004,6 @@ document.addEventListener('mousemove', (e) => {
 
   const stickyEl = document.querySelector('.sticky-container');
   if (stickyEl) {
-    // Very subtle parallax on container
     stickyEl.style.transform = 'translate(' + (dx * 6) + 'px, ' + (dy * 4) + 'px)';
   }
 }, { passive: true });
