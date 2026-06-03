@@ -799,20 +799,20 @@
 
 <script>
 // ─── FRAME SOURCE LOGIC ─────────────────────────────────────
-// This version preloads and decodes all 160 external JPG frames before enabling the scroll animation.
+// Preloads and decodes all 160 external JPG frames before enabling the scroll animation.
 // Required Vercel file location:
 //   public/frames/ezgif-frame-001.jpg ... public/frames/ezgif-frame-160.jpg
 // Browser path:
 //   /frames/ezgif-frame-001.jpg
 
 const FRAME_COUNT = 160;
-const FRAME_FILE = index => `ezgif-frame-${String(index + 1).padStart(3, '0')}.jpg`;
 const FRAME_BASE_PATH = '/frames';
+const FRAME_FILE = index => `ezgif-frame-${String(index + 1).padStart(3, '0')}.jpg`;
 const FRAME_PATH = index => `${FRAME_BASE_PATH}/${FRAME_FILE(index)}`;
 
 // ─── DOM REFERENCES ─────────────────────────────────────────
 const canvas = document.getElementById('terminal-canvas');
-const ctx = canvas.getContext('2d', { alpha: false });
+const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 const scrollSection = document.getElementById('scroll-section');
 const scrollFill = document.getElementById('scrollFill');
 const frameBadge = document.getElementById('frameBadge');
@@ -832,10 +832,9 @@ let loadedImages = 0;
 let failedImages = 0;
 let animationReady = false;
 let loaderHidden = false;
-let currentFrame = 0;
-let targetFrame = 0;
 let lastDrawnFrame = -1;
-let lastKnownScrollProgress = 0;
+let targetFrame = 0;
+let rafPending = false;
 
 // ─── LOADER HELPERS ─────────────────────────────────────────
 function updateLoaderProgress() {
@@ -843,7 +842,6 @@ function updateLoaderProgress() {
   const percent = Math.round((completed / FRAME_COUNT) * 100);
 
   if (loaderBar) loaderBar.style.width = `${percent}%`;
-
   if (loaderPct) {
     loaderPct.textContent = failedImages > 0
       ? `Loading experience — ${percent}% (${failedImages} skipped)`
@@ -924,8 +922,7 @@ async function preloadAllFrames() {
   }
 
   animationReady = true;
-  drawFrame(0, true);
-  syncTargetFrameToScroll();
+  updateFrameFromScroll(true);
   hideLoader();
 }
 
@@ -971,67 +968,44 @@ function drawFrame(frameIndex, force = false) {
 }
 
 // ─── SCROLL ANIMATION ───────────────────────────────────────
+// This version uses direct scroll-to-frame mapping instead of easing.
+// The previous easing could make the centre of the sequence feel like it had stalled.
 function getScrollProgress() {
   if (!scrollSection) return 0;
 
-  const sectionTop = scrollSection.offsetTop;
-  const sectionHeight = Math.max(1, scrollSection.offsetHeight - window.innerHeight);
-  const scrollY = window.scrollY || window.pageYOffset || 0;
+  const rect = scrollSection.getBoundingClientRect();
+  const scrollableDistance = Math.max(1, rect.height - window.innerHeight);
+  const progress = -rect.top / scrollableDistance;
 
-  return Math.max(0, Math.min(1, (scrollY - sectionTop) / sectionHeight));
+  return Math.max(0, Math.min(1, progress));
 }
 
-function syncTargetFrameToScroll() {
+function updateFrameFromScroll(force = false) {
+  if (!animationReady && !force) return;
+
   const progress = getScrollProgress();
-  lastKnownScrollProgress = progress;
-  targetFrame = progress * (FRAME_COUNT - 1);
+  targetFrame = Math.round(progress * (FRAME_COUNT - 1));
+
   if (scrollFill) scrollFill.style.height = `${progress * 100}%`;
+  drawFrame(targetFrame, force);
 }
 
-function animate() {
-  if (animationReady) {
-    const diff = targetFrame - currentFrame;
+function requestFrameUpdate() {
+  if (rafPending) return;
+  rafPending = true;
 
-    if (Math.abs(diff) > 0.01) {
-      currentFrame += diff * 0.22;
-    } else {
-      currentFrame = targetFrame;
-    }
-
-    const roundedFrame = Math.round(currentFrame);
-    const clampedFrame = Math.max(0, Math.min(FRAME_COUNT - 1, roundedFrame));
-    drawFrame(clampedFrame);
-  }
-
-  requestAnimationFrame(animate);
+  requestAnimationFrame(() => {
+    rafPending = false;
+    updateFrameFromScroll(false);
+  });
 }
 
-window.addEventListener('scroll', syncTargetFrameToScroll, { passive: true });
-window.addEventListener('resize', () => {
-  syncTargetFrameToScroll();
-  if (animationReady) drawFrame(Math.round(targetFrame), true);
-}, { passive: true });
+window.addEventListener('scroll', requestFrameUpdate, { passive: true });
+window.addEventListener('resize', () => updateFrameFromScroll(true), { passive: true });
+window.addEventListener('orientationchange', () => updateFrameFromScroll(true), { passive: true });
 
-// ─── PARALLAX SUBTLETY ──────────────────────────────────────
-// Disabled on touch devices to reduce mobile lag.
-if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
-  document.addEventListener('mousemove', (e) => {
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
-    const dx = (e.clientX - cx) / cx;
-    const dy = (e.clientY - cy) / cy;
-
-    const stickyEl = document.querySelector('.sticky-container');
-    if (stickyEl) {
-      stickyEl.style.transform = `translate(${dx * 6}px, ${dy * 4}px)`;
-    }
-  }, { passive: true });
-}
-
-// ─── START ──────────────────────────────────────────────────
-syncTargetFrameToScroll();
+// ─── START ─────────────────────────────────────────────────
 preloadAllFrames();
-animate();
 </script>
 </body>
 </html>
