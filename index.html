@@ -853,7 +853,7 @@ if (FRAME_DATA.length > 0) {
     images[i] = img;
   });
 } else {
-  allLoaded = false;
+  allLoaded = true;
   loaderBar.style.width = '100%';
   loaderPct.textContent = 'Frame images removed';
 
@@ -930,8 +930,6 @@ window.addEventListener('scroll', () => {
 
   // Update progress bar
   scrollFill.style.height = (progress * 100) + '%';
-
-  });
 
 }, { passive: true });
 
