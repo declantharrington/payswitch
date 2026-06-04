@@ -228,7 +228,7 @@
   /* ── SCROLL SECTION (STICKY CANVAS) ── */
   #scroll-section {
     position: relative;
-    height: 3500px;
+    height: 2800px;
   }
 
   .sticky-container {
@@ -265,10 +265,11 @@
   }
 
   #terminal-video {
-    width: 100%;
-    height: 100%;
+    width: 75%;
+    height: 75%;
     object-fit: contain;
     display: block;
+    margin: 0 auto;
     position: relative;
     z-index: 1;
     background: var(--black);
@@ -827,7 +828,7 @@ let lastAppliedTime = -1;
 
 // Set to true if you want the video to ONLY move forward as the user scrolls down.
 // Set to false if you want scrolling back up to rewind the video.
-const ONLY_PLAY_FORWARD = true;
+const ONLY_PLAY_FORWARD = false;
 
 function setLoaderProgress(percent, label = 'Loading experience') {
   const safePercent = Math.max(0, Math.min(100, Math.round(percent)));
