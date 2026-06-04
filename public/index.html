@@ -228,7 +228,7 @@
   /* ── SCROLL SECTION (STICKY CANVAS) ── */
   #scroll-section {
     position: relative;
-    height: 5000px;
+    height: 3500px;
   }
 
   .sticky-container {
@@ -264,14 +264,14 @@
     z-index: 3;
   }
 
-  #terminal-canvas {
+  #terminal-video {
     width: 100%;
     height: 100%;
     object-fit: contain;
     display: block;
     position: relative;
     z-index: 1;
-    mix-blend-mode: normal;
+    background: var(--black);
   }
 
   /* Scroll progress indicator */
@@ -711,10 +711,17 @@
 <!-- SCROLL SECTION -->
 <section id="scroll-section">
   <div class="sticky-container">
-    <canvas id="terminal-canvas"></canvas>
+    <video
+      id="terminal-video"
+      muted
+      playsinline
+      preload="auto"
+      poster=""
+    >
+      <source src="/frames/payswitch_hero_video.mp4" type="video/mp4">
+    </video>
 
-    <div class="frame-badge" id="frameBadge">FRAME 001 / 120</div>
-    </div>
+    <div class="frame-badge" id="frameBadge">VIDEO 0%</div>
 
     <div class="scroll-word right" id="word-1">
       <div class="scroll-word-inner">
@@ -817,21 +824,14 @@
 </footer>
 
 <script>
-// ─── FRAME SOURCE LOGIC ─────────────────────────────────────
-// Preloads and decodes all 160 external JPG frames before enabling the scroll animation.
+// ─── VIDEO SCROLL-SCRUB LOGIC ──────────────────────────────
 // Required Vercel file location:
-//   public/frames/ezgif-frame-001.jpg ... public/frames/ezgif-frame-160.jpg
+//   public/frames/payswitch_hero_video.mp4
 // Browser path:
-//   /frames/ezgif-frame-001.jpg
+//   /frames/payswitch_hero_video.mp4
 
-const FRAME_COUNT = 160;
-const FRAME_BASE_PATH = '/frames';
-const FRAME_FILE = index => `ezgif-frame-${String(index + 1).padStart(3, '0')}.jpg`;
-const FRAME_PATH = index => `${FRAME_BASE_PATH}/${FRAME_FILE(index)}`;
-
-// ─── DOM REFERENCES ─────────────────────────────────────────
-const canvas = document.getElementById('terminal-canvas');
-const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+const VIDEO_PATH = '/frames/payswitch_hero_video.mp4';
+const video = document.getElementById('terminal-video');
 const scrollSection = document.getElementById('scroll-section');
 const scrollFill = document.getElementById('scrollFill');
 const frameBadge = document.getElementById('frameBadge');
@@ -839,192 +839,138 @@ const loaderBar = document.getElementById('loaderBar');
 const loaderPct = document.getElementById('loaderPct');
 const loader = document.getElementById('loader');
 
-// ─── CANVAS SETUP ───────────────────────────────────────────
-const FRAME_WIDTH = 1280;
-const FRAME_HEIGHT = 720;
-canvas.width = FRAME_WIDTH;
-canvas.height = FRAME_HEIGHT;
-
-// ─── STATE ─────────────────────────────────────────────────
-const images = new Array(FRAME_COUNT);
-let loadedImages = 0;
-let failedImages = 0;
-let animationReady = false;
+let videoReady = false;
 let loaderHidden = false;
-let lastDrawnFrame = -1;
-let targetFrame = 0;
-let rafPending = false;
+let targetTime = 0;
+let smoothedTime = 0;
+let maxProgressReached = 0;
+let lastAppliedTime = -1;
 
-// ─── LOADER HELPERS ─────────────────────────────────────────
-function updateLoaderProgress() {
-  const completed = loadedImages + failedImages;
-  const percent = Math.round((completed / FRAME_COUNT) * 100);
+// Set to true if you want the video to ONLY move forward as the user scrolls down.
+// Set to false if you want scrolling back up to rewind the video.
+const ONLY_PLAY_FORWARD = true;
 
-  if (loaderBar) loaderBar.style.width = `${percent}%`;
-  if (loaderPct) {
-    loaderPct.textContent = failedImages > 0
-      ? `Loading experience — ${percent}% (${failedImages} skipped)`
-      : `Loading experience — ${percent}%`;
-  }
+function setLoaderProgress(percent, label = 'Loading experience') {
+  const safePercent = Math.max(0, Math.min(100, Math.round(percent)));
+  if (loaderBar) loaderBar.style.width = `${safePercent}%`;
+  if (loaderPct) loaderPct.textContent = `${label} — ${safePercent}%`;
 }
 
 function hideLoader() {
   if (loaderHidden) return;
   loaderHidden = true;
-
-  if (loaderPct) loaderPct.textContent = 'Loading experience — 100%';
-  if (loaderBar) loaderBar.style.width = '100%';
-
+  setLoaderProgress(100, 'Loading experience');
   setTimeout(() => {
     if (loader) loader.classList.add('hidden');
   }, 250);
 }
 
-function drawPlaceholder(title, subtitle) {
-  ctx.fillStyle = '#020408';
-  ctx.fillRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-  ctx.font = '500 28px Inter, sans-serif';
-  ctx.fillStyle = 'rgba(240,244,255,0.75)';
-  ctx.textAlign = 'center';
-  ctx.fillText(title, FRAME_WIDTH / 2, FRAME_HEIGHT / 2 - 12);
-  ctx.font = '400 16px Inter, sans-serif';
-  ctx.fillStyle = 'rgba(200,210,240,0.5)';
-  ctx.fillText(subtitle, FRAME_WIDTH / 2, FRAME_HEIGHT / 2 + 24);
-}
-
-// ─── FRAME PRELOAD ──────────────────────────────────────────
-function preloadFrame(index) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.decoding = 'async';
-
-    img.onload = async () => {
-      try {
-        if (img.decode) await img.decode();
-      } catch (error) {
-        // Some browsers can throw here even after onload. The image is still usable.
-      }
-
-      images[index] = img;
-      loadedImages++;
-      updateLoaderProgress();
-      resolve({ index, ok: true });
-    };
-
-    img.onerror = () => {
-      failedImages++;
-      updateLoaderProgress();
-      console.warn(`Failed to preload frame ${index + 1}: ${FRAME_PATH(index)}`);
-      resolve({ index, ok: false });
-    };
-
-    img.src = FRAME_PATH(index);
-  });
-}
-
-async function preloadAllFrames() {
-  updateLoaderProgress();
-
-  const results = await Promise.all(
-    Array.from({ length: FRAME_COUNT }, (_, index) => preloadFrame(index))
-  );
-
-  const successfulFrames = results.filter(result => result.ok).length;
-
-  if (successfulFrames === 0) {
-    drawPlaceholder(
-      'Frame images could not be loaded',
-      'Check that /frames/ezgif-frame-001.jpg opens in your browser.'
-    );
-    hideLoader();
-    return;
-  }
-
-  animationReady = true;
-  updateFrameFromScroll(true);
-  hideLoader();
-}
-
-// ─── DRAWING ────────────────────────────────────────────────
-function findNearestLoadedFrame(frameIndex) {
-  if (images[frameIndex]) return frameIndex;
-
-  for (let offset = 1; offset < FRAME_COUNT; offset++) {
-    const back = frameIndex - offset;
-    const forward = frameIndex + offset;
-
-    if (back >= 0 && images[back]) return back;
-    if (forward < FRAME_COUNT && images[forward]) return forward;
-  }
-
-  return -1;
-}
-
-function drawFrame(frameIndex, force = false) {
-  if (!animationReady && !force) return;
-
-  const clampedIndex = Math.max(0, Math.min(FRAME_COUNT - 1, frameIndex));
-  const usableFrameIndex = findNearestLoadedFrame(clampedIndex);
-
-  if (usableFrameIndex < 0) return;
-  if (!force && usableFrameIndex === lastDrawnFrame) return;
-
-  const img = images[usableFrameIndex];
-
-  try {
-    ctx.fillStyle = '#020408';
-    ctx.fillRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-    ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-    lastDrawnFrame = usableFrameIndex;
-
-    if (frameBadge) {
-      const frameNum = String(usableFrameIndex + 1).padStart(3, '0');
-      frameBadge.textContent = `FRAME ${frameNum} / ${FRAME_COUNT}`;
-    }
-  } catch (error) {
-    console.warn('Could not draw frame:', usableFrameIndex + 1, error);
-  }
-}
-
-// ─── SCROLL ANIMATION ───────────────────────────────────────
-// This version uses direct scroll-to-frame mapping instead of easing.
-// The previous easing could make the centre of the sequence feel like it had stalled.
 function getScrollProgress() {
   if (!scrollSection) return 0;
 
   const rect = scrollSection.getBoundingClientRect();
-  const scrollableDistance = Math.max(1, rect.height - window.innerHeight);
-  const progress = -rect.top / scrollableDistance;
+  const scrollableDistance = Math.max(1, scrollSection.offsetHeight - window.innerHeight);
+  const rawProgress = -rect.top / scrollableDistance;
 
-  return Math.max(0, Math.min(1, progress));
+  return Math.max(0, Math.min(1, rawProgress));
 }
 
-function updateFrameFromScroll(force = false) {
-  if (!animationReady && !force) return;
+function updateTargetTimeFromScroll() {
+  if (!videoReady || !video.duration) return;
 
-  const progress = getScrollProgress();
-  targetFrame = Math.round(progress * (FRAME_COUNT - 1));
+  let progress = getScrollProgress();
+
+  if (ONLY_PLAY_FORWARD) {
+    maxProgressReached = Math.max(maxProgressReached, progress);
+    progress = maxProgressReached;
+  }
+
+  targetTime = progress * video.duration;
 
   if (scrollFill) scrollFill.style.height = `${progress * 100}%`;
-  drawFrame(targetFrame, force);
+  if (frameBadge) frameBadge.textContent = `VIDEO ${Math.round(progress * 100)}%`;
 }
 
-function requestFrameUpdate() {
-  if (rafPending) return;
-  rafPending = true;
+function smoothScrubLoop() {
+  if (videoReady && video.duration) {
+    updateTargetTimeFromScroll();
 
-  requestAnimationFrame(() => {
-    rafPending = false;
-    updateFrameFromScroll(false);
+    // Lower = smoother/slower. Higher = snappier/follows scroll more closely.
+    smoothedTime += (targetTime - smoothedTime) * 0.16;
+
+    // Avoid excessive currentTime writes, which can cause stutter.
+    if (Math.abs(smoothedTime - lastAppliedTime) > 0.015) {
+      try {
+        video.currentTime = Math.max(0, Math.min(video.duration, smoothedTime));
+        lastAppliedTime = smoothedTime;
+      } catch (error) {
+        // Some browsers briefly reject seeking before enough data is available.
+      }
+    }
+  }
+
+  requestAnimationFrame(smoothScrubLoop);
+}
+
+function prepareVideo() {
+  if (!video) return;
+
+  video.pause();
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+
+  // The video path is also defined in the <source>, but this keeps it explicit.
+  if (!video.currentSrc) {
+    video.src = VIDEO_PATH;
+  }
+
+  setLoaderProgress(8, 'Loading video');
+
+  video.addEventListener('loadstart', () => setLoaderProgress(18, 'Loading video'), { once: true });
+  video.addEventListener('loadedmetadata', () => {
+    setLoaderProgress(55, 'Preparing video');
+
+    videoReady = true;
+    targetTime = 0;
+    smoothedTime = 0;
+
+    try { video.currentTime = 0.001; } catch (error) {}
+
+    updateTargetTimeFromScroll();
+    setLoaderProgress(100, 'Video ready');
+    hideLoader();
+  }, { once: true });
+
+  video.addEventListener('canplaythrough', () => {
+    videoReady = true;
+    hideLoader();
+  }, { once: true });
+
+  video.addEventListener('error', () => {
+    if (loaderPct) {
+      loaderPct.textContent = 'Video could not load — check /frames/payswitch_hero_video.mp4';
+    }
+    console.error('Video failed to load:', VIDEO_PATH);
   });
+
+  // Safety fallback so the loader does not stay forever if canplaythrough never fires.
+  setTimeout(() => {
+    if (!loaderHidden && video.readyState >= 1) {
+      videoReady = true;
+      hideLoader();
+    }
+  }, 2500);
+
+  video.load();
 }
 
-window.addEventListener('scroll', requestFrameUpdate, { passive: true });
-window.addEventListener('resize', () => updateFrameFromScroll(true), { passive: true });
-window.addEventListener('orientationchange', () => updateFrameFromScroll(true), { passive: true });
+window.addEventListener('scroll', updateTargetTimeFromScroll, { passive: true });
+window.addEventListener('resize', updateTargetTimeFromScroll, { passive: true });
+window.addEventListener('orientationchange', updateTargetTimeFromScroll, { passive: true });
 
-// ─── START ─────────────────────────────────────────────────
-preloadAllFrames();
+prepareVideo();
+smoothScrubLoop();
 </script>
 </body>
 </html>
