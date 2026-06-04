@@ -192,12 +192,27 @@
     margin: 0 auto 28px;
   }
 
-  h1 em {
-    font-style: normal;
-    background: linear-gradient(135deg, #A8C8FF 0%, #1A6BFF 50%, #6B9FFF 100%);
+  .gradient-text {
+    display: inline-block;
+    background: linear-gradient(
+      90deg,
+      #ffffff 0%,
+      #b7d3ff 20%,
+      #1A6BFF 50%,
+      #6aa7ff 80%,
+      #ffffff 100%
+    );
+    background-size: 300% 100%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: shimmer 8s linear infinite;
+    text-shadow: none;
+  }
+
+  @keyframes shimmer {
+    from { background-position: 0% 0%; }
+    to { background-position: 300% 0%; }
   }
 
   .hero-sub {
@@ -643,6 +658,10 @@
   }
 
 
+  @media (prefers-reduced-motion: reduce) {
+    .gradient-text { animation: none; }
+  }
+
   @media (max-width: 768px) {
     nav { padding: 16px 24px; }
     .nav-links { display: none; }
@@ -685,7 +704,7 @@
 <!-- HERO HEADLINE -->
 <div class="hero-headline-wrap">
   <div class="eyebrow">AI-Powered Payments Intelligence</div>
-  <h1>Look inside your<br><em>payments stack</em></h1>
+  <h1>Look inside your<br><span class="gradient-text">payments stack</span></h1>
   <p class="hero-sub">Upload your payment documents. Our AI audits your entire stack — then connects you with industry experts to act on every finding.</p>
 </div>
 
