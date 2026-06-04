@@ -181,19 +181,24 @@
     font-family: 'Manrope', sans-serif;
     font-size: clamp(52px, 7vw, 108px);
     font-weight: 800;
-    line-height: 0.95;
+    line-height: 1.08;
     letter-spacing: -0.04em;
     color: #FFFFFF;
     text-shadow:
       0 0 60px rgba(58, 138, 255, 0.35),
       0 0 120px rgba(58, 138, 255, 0.15),
       0 0 200px rgba(58, 138, 255, 0.08);
-    max-width: 900px;
-    margin: 0 auto 28px;
+    max-width: 1000px;
+    margin: 0 auto 30px;
+    padding: 0.08em 0 0.14em;
+    overflow: visible;
   }
 
   .gradient-text {
     display: inline-block;
+    font-size: 1.14em;
+    line-height: 1;
+    padding: 0 0.025em 0.04em;
     background: linear-gradient(
       90deg,
       #ffffff 0%,
@@ -273,6 +278,9 @@
     position: relative;
     z-index: 1;
     background: var(--black);
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform;
   }
 
   /* Scroll progress indicator */
@@ -660,7 +668,7 @@
 
 
   @media (prefers-reduced-motion: reduce) {
-    .gradient-text { animation: none; }
+    .gradient-text { animation: none; font-size: 1.08em; }
   }
 
   @media (max-width: 768px) {
@@ -822,13 +830,19 @@ const loader = document.getElementById('loader');
 let videoReady = false;
 let loaderHidden = false;
 let targetTime = 0;
-let smoothedTime = 0;
-let maxProgressReached = 0;
 let lastAppliedTime = -1;
+let rafPending = false;
+let lastSeekAt = 0;
 
-// Set to true if you want the video to ONLY move forward as the user scrolls down.
-// Set to false if you want scrolling back up to rewind the video.
+// Keeps the video perfectly tied to scroll position.
+// Scroll down = forward. Scroll up = reverse.
 const ONLY_PLAY_FORWARD = false;
+let maxProgressReached = 0;
+
+// Lower value = more currentTime writes. Higher value = smoother browser performance.
+// 24ms is roughly 40 updates/sec, which is usually smoother than hammering currentTime at 60fps.
+const SEEK_THROTTLE_MS = 24;
+const MIN_SEEK_DELTA = 0.018;
 
 function setLoaderProgress(percent, label = 'Loading experience') {
   const safePercent = Math.max(0, Math.min(100, Math.round(percent)));
@@ -839,10 +853,10 @@ function setLoaderProgress(percent, label = 'Loading experience') {
 function hideLoader() {
   if (loaderHidden) return;
   loaderHidden = true;
-  setLoaderProgress(100, 'Loading experience');
+  setLoaderProgress(100, 'Video ready');
   setTimeout(() => {
     if (loader) loader.classList.add('hidden');
-  }, 250);
+  }, 220);
 }
 
 function getScrollProgress() {
@@ -855,7 +869,7 @@ function getScrollProgress() {
   return Math.max(0, Math.min(1, rawProgress));
 }
 
-function updateTargetTimeFromScroll() {
+function calculateTargetTime() {
   if (!videoReady || !video.duration) return;
 
   let progress = getScrollProgress();
@@ -871,25 +885,38 @@ function updateTargetTimeFromScroll() {
   if (frameBadge) frameBadge.textContent = `VIDEO ${Math.round(progress * 100)}%`;
 }
 
-function smoothScrubLoop() {
-  if (videoReady && video.duration) {
-    updateTargetTimeFromScroll();
+function applyVideoTime() {
+  rafPending = false;
 
-    // Lower = smoother/slower. Higher = snappier/follows scroll more closely.
-    smoothedTime += (targetTime - smoothedTime) * 0.16;
+  if (!videoReady || !video.duration) return;
 
-    // Avoid excessive currentTime writes, which can cause stutter.
-    if (Math.abs(smoothedTime - lastAppliedTime) > 0.015) {
-      try {
-        video.currentTime = Math.max(0, Math.min(video.duration, smoothedTime));
-        lastAppliedTime = smoothedTime;
-      } catch (error) {
-        // Some browsers briefly reject seeking before enough data is available.
-      }
+  const now = performance.now();
+  const clampedTime = Math.max(0, Math.min(video.duration, targetTime));
+
+  // Avoid excessive seeks; they are the main cause of scroll lag with MP4 scrubbing.
+  if (now - lastSeekAt < SEEK_THROTTLE_MS) return;
+  if (Math.abs(clampedTime - lastAppliedTime) < MIN_SEEK_DELTA) return;
+
+  try {
+    if (typeof video.fastSeek === 'function') {
+      video.fastSeek(clampedTime);
+    } else {
+      video.currentTime = clampedTime;
     }
+    lastAppliedTime = clampedTime;
+    lastSeekAt = now;
+  } catch (error) {
+    // Some browsers briefly reject seeking while the video is buffering.
   }
+}
 
-  requestAnimationFrame(smoothScrubLoop);
+function requestVideoUpdate() {
+  calculateTargetTime();
+
+  if (!rafPending) {
+    rafPending = true;
+    requestAnimationFrame(applyVideoTime);
+  }
 }
 
 function prepareVideo() {
@@ -900,31 +927,31 @@ function prepareVideo() {
   video.playsInline = true;
   video.preload = 'auto';
 
-  // The video path is also defined in the <source>, but this keeps it explicit.
   if (!video.currentSrc) {
     video.src = VIDEO_PATH;
   }
 
-  setLoaderProgress(8, 'Loading video');
+  setLoaderProgress(10, 'Loading video');
 
-  video.addEventListener('loadstart', () => setLoaderProgress(18, 'Loading video'), { once: true });
+  video.addEventListener('loadstart', () => setLoaderProgress(25, 'Loading video'), { once: true });
+
   video.addEventListener('loadedmetadata', () => {
-    setLoaderProgress(55, 'Preparing video');
+    setLoaderProgress(70, 'Preparing video');
 
     videoReady = true;
     targetTime = 0;
-    smoothedTime = 0;
+    lastAppliedTime = -1;
 
     try { video.currentTime = 0.001; } catch (error) {}
 
-    updateTargetTimeFromScroll();
-    setLoaderProgress(100, 'Video ready');
+    requestVideoUpdate();
     hideLoader();
   }, { once: true });
 
-  video.addEventListener('canplaythrough', () => {
+  video.addEventListener('canplay', () => {
     videoReady = true;
     hideLoader();
+    requestVideoUpdate();
   }, { once: true });
 
   video.addEventListener('error', () => {
@@ -934,23 +961,23 @@ function prepareVideo() {
     console.error('Video failed to load:', VIDEO_PATH);
   });
 
-  // Safety fallback so the loader does not stay forever if canplaythrough never fires.
   setTimeout(() => {
     if (!loaderHidden && video.readyState >= 1) {
       videoReady = true;
       hideLoader();
+      requestVideoUpdate();
     }
   }, 2500);
 
   video.load();
 }
 
-window.addEventListener('scroll', updateTargetTimeFromScroll, { passive: true });
-window.addEventListener('resize', updateTargetTimeFromScroll, { passive: true });
-window.addEventListener('orientationchange', updateTargetTimeFromScroll, { passive: true });
+window.addEventListener('scroll', requestVideoUpdate, { passive: true });
+window.addEventListener('resize', requestVideoUpdate, { passive: true });
+window.addEventListener('orientationchange', requestVideoUpdate, { passive: true });
 
 prepareVideo();
-smoothScrubLoop();
+requestVideoUpdate();
 </script>
 </body>
 </html>
