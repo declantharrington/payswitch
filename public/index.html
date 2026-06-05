@@ -307,41 +307,10 @@
     display: none;
   }
 
-  .carousel-dots {
-    position: absolute;
-    bottom: 36px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 10px;
-    z-index: 20;
-  }
-
-  .carousel-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.25);
-    transition: background 0.3s, transform 0.3s;
-  }
-
-  .carousel-dot.active {
-    background: var(--blue);
-    transform: scale(1.5);
-  }
-
+  .carousel-dots,
   .carousel-counter {
-    position: absolute;
-    top: 96px;
-    right: 36px;
-    z-index: 20;
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    color: rgba(255,255,255,0.28);
-    text-transform: uppercase;
+    display: none !important;
   }
-
-  .carousel-counter span { color: rgba(255,255,255,0.75); }
 
   .carousel-scroll-hint {
     position: absolute;
@@ -761,8 +730,6 @@
       <div class="tunnel-ring" style="width:min(680px,76vw);height:calc(min(680px,76vw)*10/16);opacity:0.2;"></div>
     </div>
 
-    <div class="carousel-dots" id="carouselDots"></div>
-    <div class="carousel-counter"><span id="curNum">1</span> / <span id="totalNum">6</span></div>
     <div class="carousel-scroll-hint" id="scrollHint">scroll to explore</div>
   </div>
 </section>
@@ -854,9 +821,6 @@ const MIN_VEL = 0.001;
 
 const scrollSection = document.getElementById('scroll-section');
 const scene = document.getElementById('carouselScene');
-const dotsEl = document.getElementById('carouselDots');
-const curNumEl = document.getElementById('curNum');
-const totalNumEl = document.getElementById('totalNum');
 const scrollHint = document.getElementById('scrollHint');
 const loaderBar = document.getElementById('loaderBar');
 const loaderPct = document.getElementById('loaderPct');
@@ -870,7 +834,6 @@ let loaderHidden = false;
 let hintFaded = false;
 
 const maxPos = images.length - 1;
-if (totalNumEl) totalNumEl.textContent = images.length;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -918,11 +881,6 @@ const slides = images.map((src) => {
   return el;
 });
 
-images.forEach((_, i) => {
-  const dot = document.createElement('div');
-  dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
-  dotsEl.appendChild(dot);
-});
 
 function applyTransforms() {
   const pos = scrollPos;
@@ -947,9 +905,6 @@ function applyTransforms() {
     el.style.transform = `translateZ(${z}px) scale(${scale})`;
   });
 
-  const activeIdx = Math.round(clamp(pos, 0, maxPos));
-  document.querySelectorAll('.carousel-dot').forEach((dot, i) => dot.classList.toggle('active', i === activeIdx));
-  if (curNumEl) curNumEl.textContent = activeIdx + 1;
 }
 
 function tick() {
