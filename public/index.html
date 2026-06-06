@@ -888,6 +888,8 @@ const slides = images.map((src) => {
   return el;
 });
 
+const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+
 function applyTransforms() {
   const pos = scrollPos;
 
