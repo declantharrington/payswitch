@@ -365,7 +365,7 @@ input#psa-file-input { display: none; }
 </div>
 
 <script>
-const PSA_API_KEY = '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';
+const PSA_API_KEY = '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';
 
 function openAnalyserModal() {
   const bd = document.getElementById('psa-backdrop');
@@ -470,7 +470,7 @@ Return this exact structure:
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': PSA_API_KEY, 'anthropic-version': '2023-06-01' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': PSA_API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, system, messages:[{ role:'user', content }] })
     });
 
