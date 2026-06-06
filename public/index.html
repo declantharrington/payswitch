@@ -691,6 +691,297 @@
     .features-grid { grid-template-columns: 1fr; }
     footer { flex-direction: column; gap: 16px; text-align: center; }
   }
+
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── ANALYSER MODAL ── */
+#psa-backdrop {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; transition: opacity 0.25s ease;
+}
+#psa-backdrop.open { display: flex; }
+#psa-backdrop.visible { opacity: 1; }
+ 
+#psa-modal {
+  background: #111118;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  width: 100%; max-width: 640px;
+  max-height: 90vh; overflow-y: auto;
+  position: relative;
+  transform: translateY(20px);
+  transition: transform 0.3s cubic-bezier(0.22,1,0.36,1);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+}
+#psa-backdrop.visible #psa-modal { transform: translateY(0); }
+ 
+/* Scrollbar styling */
+#psa-modal::-webkit-scrollbar { width: 4px; }
+#psa-modal::-webkit-scrollbar-track { background: transparent; }
+#psa-modal::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+ 
+#psa-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.5); z-index: 10;
+  transition: background 0.15s;
+}
+#psa-close:hover { background: rgba(255,255,255,0.14); }
+#psa-close svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; }
+ 
+.psa-inner { padding: 40px 36px 44px; }
+ 
+/* Eyebrow + title */
+.psa-eyebrow {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.16em;
+  text-transform: uppercase; color: #1a5cff; margin-bottom: 10px;
+}
+.psa-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 30px; line-height: 1.1; color: #ffffff;
+  margin-bottom: 8px; letter-spacing: -0.02em;
+}
+.psa-title em { font-style: italic; color: #6fa8ff; }
+.psa-sub {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px; line-height: 1.65;
+  color: rgba(255,255,255,0.42); margin-bottom: 28px;
+}
+ 
+/* Tabs */
+.psa-tabs {
+  display: flex; gap: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px; padding: 4px; margin-bottom: 20px; width: fit-content;
+}
+.psa-tab {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 500;
+  color: rgba(255,255,255,0.45); background: none; border: none;
+  border-radius: 7px; padding: 7px 16px; cursor: pointer;
+  transition: all 0.18s;
+}
+.psa-tab.active {
+  background: rgba(255,255,255,0.1); color: #ffffff;
+}
+ 
+/* Drop zone */
+.psa-drop {
+  border: 2px dashed rgba(255,255,255,0.12); border-radius: 14px;
+  padding: 44px 24px; text-align: center; cursor: pointer;
+  transition: all 0.2s; background: rgba(255,255,255,0.03);
+}
+.psa-drop:hover, .psa-drop.drag-over {
+  border-color: #1a5cff; background: rgba(26,92,255,0.06);
+}
+.psa-drop.has-file { border-style: solid; border-color: #0a7a52; background: rgba(10,122,82,0.08); }
+.psa-drop-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: rgba(255,255,255,0.07); display: flex; align-items: center;
+  justify-content: center; margin: 0 auto 14px;
+}
+.psa-drop-icon svg { width: 22px; height: 22px; stroke: rgba(255,255,255,0.5); stroke-width: 1.5; fill: none; }
+.psa-drop.has-file .psa-drop-icon { background: rgba(10,122,82,0.15); }
+.psa-drop.has-file .psa-drop-icon svg { stroke: #4de8a4; }
+.psa-drop-title { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.7); margin-bottom: 5px; }
+.psa-drop-sub { font-family: 'DM Sans', sans-serif; font-size: 12px; color: rgba(255,255,255,0.35); }
+.psa-drop-formats { font-family: 'DM Sans', sans-serif; font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 10px; }
+input#psa-file-input { display: none; }
+ 
+/* Paste area */
+.psa-paste {
+  width: 100%; min-height: 180px; padding: 16px;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.65;
+  color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.05);
+  border: 1.5px solid rgba(255,255,255,0.1); border-radius: 14px;
+  outline: none; resize: vertical; transition: border-color 0.18s;
+}
+.psa-paste:focus { border-color: #1a5cff; }
+.psa-paste::placeholder { color: rgba(255,255,255,0.2); }
+ 
+/* Submit */
+.psa-submit-row { margin-top: 18px; display: flex; align-items: center; gap: 14px; }
+.psa-btn {
+  display: flex; align-items: center; gap: 9px;
+  background: #1a5cff; color: white; border: none;
+  border-radius: 11px; padding: 14px 26px;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: opacity 0.15s, transform 0.12s;
+  letter-spacing: -0.01em; white-space: nowrap;
+}
+.psa-btn:hover { opacity: 0.88; }
+.psa-btn:active { transform: scale(0.97); }
+.psa-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+.psa-btn svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2; fill: none; }
+.psa-note { font-family: 'DM Sans', sans-serif; font-size: 12px; color: rgba(255,255,255,0.25); line-height: 1.5; }
+ 
+/* Error */
+.psa-error {
+  background: rgba(192,57,43,0.12); border-left: 3px solid #c0392b;
+  border-radius: 10px; padding: 14px 16px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; color: #ff6b6b;
+  display: none; margin-top: 14px; line-height: 1.6;
+}
+.psa-error.show { display: block; }
+ 
+/* Loading */
+.psa-loading { display: none; padding: 48px 36px; text-align: center; }
+.psa-loading.show { display: block; }
+.psa-ring {
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 2.5px solid rgba(255,255,255,0.08); border-top-color: #1a5cff;
+  animation: psaSpin 0.9s linear infinite; margin: 0 auto 28px;
+}
+@keyframes psaSpin { to { transform: rotate(360deg); } }
+.psa-steps { display: flex; flex-direction: column; gap: 8px; max-width: 280px; margin: 0 auto; }
+.psa-step {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px;
+  color: rgba(255,255,255,0.3); padding: 9px 12px;
+  border-radius: 9px; transition: all 0.3s;
+}
+.psa-step.active { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.06); font-weight: 500; }
+.psa-step.done { color: #4de8a4; }
+.psa-step-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.12); flex-shrink: 0; transition: background 0.3s; }
+.psa-step.active .psa-step-dot { background: #1a5cff; animation: psaBlink 1s ease infinite; }
+.psa-step.done .psa-step-dot { background: #4de8a4; }
+@keyframes psaBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+ 
+/* ── REPORT ── */
+.psa-report { display: none; }
+.psa-report.show { display: block; }
+ 
+.psa-report-header {
+  background: linear-gradient(135deg, #0d1628 0%, #111827 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 32px 36px 28px;
+}
+.psa-report-eyebrow {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 8px;
+}
+.psa-report-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 22px; line-height: 1.15; color: white; margin-bottom: 4px;
+}
+.psa-report-meta { font-family: 'DM Sans', sans-serif; font-size: 12px; color: rgba(255,255,255,0.3); }
+.psa-stats {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 1px; margin-top: 22px;
+  background: rgba(255,255,255,0.07); border-radius: 12px; overflow: hidden;
+}
+.psa-stat { padding: 14px 12px; background: rgba(255,255,255,0.04); text-align: center; }
+.psa-stat-val { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: -0.04em; color: white; display: block; margin-bottom: 3px; }
+.psa-stat-val.good { color: #4de8a4; }
+.psa-stat-lbl { font-family: 'DM Sans', sans-serif; font-size: 10px; color: rgba(255,255,255,0.28); text-transform: uppercase; letter-spacing: 0.09em; }
+ 
+.psa-report-body { padding: 0 36px 36px; }
+.psa-section { padding: 24px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.psa-section:last-child { border-bottom: none; }
+.psa-section-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: rgba(255,255,255,0.3); margin-bottom: 12px;
+}
+.psa-section-h {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 18px; color: white; margin-bottom: 8px; line-height: 1.25;
+}
+.psa-section-text {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; line-height: 1.75; color: rgba(255,255,255,0.5);
+  white-space: pre-line;
+}
+ 
+/* Data table */
+.psa-table { width: 100%; border-collapse: collapse; }
+.psa-table td {
+  font-family: 'DM Sans', sans-serif;
+  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 13px; vertical-align: top;
+}
+.psa-table tr:last-child td { border-bottom: none; }
+.psa-table td:first-child { color: rgba(255,255,255,0.4); }
+.psa-table td:last-child { text-align: right; font-weight: 500; color: rgba(255,255,255,0.85); }
+ 
+/* Alert boxes */
+.psa-alert {
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 8px;
+  display: flex; align-items: flex-start; gap: 10px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.6;
+}
+.psa-alert.warn { background: rgba(200,150,12,0.1); border-left: 3px solid #c8960c; color: rgba(255,255,255,0.65); }
+.psa-alert.good { background: rgba(10,122,82,0.1); border-left: 3px solid #0a7a52; color: rgba(255,255,255,0.65); }
+.psa-alert.info { background: rgba(26,92,255,0.1); border-left: 3px solid #1a5cff; color: rgba(255,255,255,0.65); }
+.psa-alert svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; stroke: currentColor; stroke-width: 2; fill: none; }
+.psa-alert.warn svg { color: #c8960c; }
+.psa-alert.good svg { color: #4de8a4; }
+.psa-alert.info svg { color: #6fa8ff; }
+.psa-alert strong { font-weight: 600; display: block; margin-bottom: 3px; color: rgba(255,255,255,0.85); }
+ 
+/* Recommendation */
+.psa-rec {
+  background: rgba(26,92,255,0.08); border: 1px solid rgba(26,92,255,0.2);
+  border-radius: 14px; padding: 22px; margin-top: 4px;
+}
+.psa-rec-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #6fa8ff; margin-bottom: 8px;
+}
+.psa-rec-h {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 17px; color: white; margin-bottom: 10px; line-height: 1.25;
+}
+.psa-rec-body {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; line-height: 1.72; color: rgba(255,255,255,0.5);
+}
+.psa-rec-steps {
+  margin-top: 14px; padding-left: 18px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.psa-rec-steps li {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.6;
+}
+ 
+/* Report actions */
+.psa-actions { display: flex; gap: 10px; margin-top: 24px; padding: 0 36px 36px; flex-wrap: wrap; }
+.psa-btn-dl {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8);
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
+  padding: 11px 20px; font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s;
+}
+.psa-btn-dl:hover { background: rgba(255,255,255,0.14); }
+.psa-btn-dl svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; }
+.psa-btn-restart {
+  background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  padding: 11px 20px; font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.4);
+  cursor: pointer; transition: border-color 0.15s;
+}
+.psa-btn-restart:hover { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); }
+ 
+@media (max-width: 600px) {
+  .psa-inner { padding: 28px 20px 32px; }
+  .psa-report-header { padding: 24px 20px 20px; }
+  .psa-report-body { padding: 0 20px 28px; }
+  .psa-actions { padding: 0 20px 28px; }
+  .psa-title { font-size: 24px; }
+}
 </style>
 </head>
 <body>
@@ -746,7 +1037,7 @@
   <p class="outro-label">Upload. Analyse. Optimise.</p>
   <h2 class="outro-headline">Your payments program has problems you don't know about yet</h2>
   <p class="outro-sub">Provide a short overview of your payments program. Our AI identifies where you are overpaying, every point where revenue is leaking, and every gap in your payments infrastructure - then an expert walks you through exactly what to fix and how to do it at no cost to you.</p>
-  <a href="#" class="cta-btn">
+  <a href="#" class="cta-btn"onclick="openAnalyserModal()">
     Start for free
     <span class="cta-arrow"></span>
   </a>
@@ -1004,6 +1295,93 @@ document.addEventListener('keydown', (event) => {
 applyTransforms();
 preloadCarouselImages();
 requestCarouselUpdate();
+
+<div id="psa-backdrop" onclick="psaBackdropClick(event)">
+  <div id="psa-modal">
+    <button id="psa-close" onclick="closeAnalyserModal()">
+      <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+ 
+    <!-- Upload panel -->
+    <div id="psa-upload-panel">
+      <div class="psa-inner">
+        <div class="psa-eyebrow">AI Statement Analyser</div>
+        <div class="psa-title">Find out what you're<br><em>actually</em> paying.</div>
+        <div class="psa-sub">Upload or paste your merchant statement. Our AI reads it like a payments consultant — extracting your effective rate, fee breakdown, and pricing model — then writes a full report with recommendations.</div>
+ 
+        <div class="psa-tabs">
+          <button class="psa-tab active" onclick="psaSwitchTab('upload',this)">Upload file</button>
+          <button class="psa-tab" onclick="psaSwitchTab('paste',this)">Paste text</button>
+        </div>
+ 
+        <div id="psa-upload-tab">
+          <div class="psa-drop" id="psa-drop"
+               onclick="document.getElementById('psa-file-input').click()"
+               ondragover="psaDragOver(event)" ondragleave="psaDragLeave(event)" ondrop="psaDrop(event)">
+            <div class="psa-drop-icon">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="psa-drop-title" id="psa-drop-label">Drop your statement here</div>
+            <div class="psa-drop-sub" id="psa-drop-sub">or tap to browse</div>
+            <div class="psa-drop-formats">PDF · PNG · JPG · HEIC</div>
+          </div>
+          <input type="file" id="psa-file-input" accept=".pdf,image/*" onchange="psaFileSelect(event)">
+        </div>
+ 
+        <div id="psa-paste-tab" style="display:none">
+          <textarea class="psa-paste" id="psa-paste-area"
+            placeholder="Paste your merchant statement data — transaction summary, fee breakdown, effective rate, monthly volume. The more detail, the better the analysis."
+            oninput="psaValidate()"></textarea>
+        </div>
+ 
+        <div class="psa-submit-row">
+          <button class="psa-btn" id="psa-btn-analyse" onclick="psaRunAnalysis()" disabled>
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Analyse statement
+          </button>
+          <div class="psa-note">Processed securely.<br>Statement data is not stored.</div>
+        </div>
+        <div class="psa-error" id="psa-error"></div>
+      </div>
+    </div>
+ 
+    <!-- Loading panel -->
+    <div id="psa-loading-panel" class="psa-loading">
+      <div class="psa-ring"></div>
+      <div class="psa-steps">
+        <div class="psa-step active" id="psa-s1"><div class="psa-step-dot"></div>Reading your statement</div>
+        <div class="psa-step" id="psa-s2"><div class="psa-step-dot"></div>Extracting fee structure</div>
+        <div class="psa-step" id="psa-s3"><div class="psa-step-dot"></div>Benchmarking against market rates</div>
+        <div class="psa-step" id="psa-s4"><div class="psa-step-dot"></div>Writing your report</div>
+      </div>
+    </div>
+ 
+    <!-- Report panel -->
+    <div id="psa-report-panel" class="psa-report">
+      <div class="psa-report-header">
+        <div class="psa-report-eyebrow">Merchant Statement Analysis · Payswitch AI</div>
+        <div class="psa-report-title" id="psa-r-title">Statement Review</div>
+        <div class="psa-report-meta" id="psa-r-meta"></div>
+        <div class="psa-stats">
+          <div class="psa-stat"><span class="psa-stat-val" id="psa-r-rate">—</span><span class="psa-stat-lbl">Effective rate</span></div>
+          <div class="psa-stat"><span class="psa-stat-val" id="psa-r-fees">—</span><span class="psa-stat-lbl">Total fees</span></div>
+          <div class="psa-stat"><span class="psa-stat-val good" id="psa-r-saving">—</span><span class="psa-stat-lbl">Est. saving/yr</span></div>
+        </div>
+      </div>
+      <div class="psa-report-body" id="psa-r-body"></div>
+      <div class="psa-actions">
+        <button class="psa-btn-dl" onclick="psaDownload()">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download report
+        </button>
+        <button class="psa-btn-restart" onclick="psaReset()">Analyse another</button>
+      </div>
+    </div>
+ 
+  </div>
+</div>
+ 
+<script> 
 </script>
 </body>
 </html>
