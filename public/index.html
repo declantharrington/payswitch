@@ -1381,8 +1381,234 @@ requestCarouselUpdate();
  
   </div>
 </div>
+<script>
+const PSA_API_KEY = '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';
  
-<script> 
+function openAnalyserModal() {
+  const bd = document.getElementById('psa-backdrop');
+  bd.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => bd.classList.add('visible'));
+}
+function closeAnalyserModal() {
+  const bd = document.getElementById('psa-backdrop');
+  bd.classList.remove('visible');
+  setTimeout(() => { bd.classList.remove('open'); document.body.style.overflow = ''; }, 250);
+}
+function psaBackdropClick(e) { if (e.target === document.getElementById('psa-backdrop')) closeAnalyserModal(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAnalyserModal(); });
+ 
+let psaTab = 'upload', psaFile = null;
+ 
+function psaSwitchTab(tab, btn) {
+  psaTab = tab;
+  document.querySelectorAll('.psa-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('psa-upload-tab').style.display = tab === 'upload' ? 'block' : 'none';
+  document.getElementById('psa-paste-tab').style.display  = tab === 'paste'  ? 'block' : 'none';
+  psaValidate();
+}
+ 
+function psaDragOver(e) { e.preventDefault(); document.getElementById('psa-drop').classList.add('drag-over'); }
+function psaDragLeave()  { document.getElementById('psa-drop').classList.remove('drag-over'); }
+function psaDrop(e) { e.preventDefault(); document.getElementById('psa-drop').classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if (f) psaSetFile(f); }
+function psaFileSelect(e) { const f = e.target.files[0]; if (f) psaSetFile(f); }
+function psaSetFile(f) {
+  psaFile = f;
+  document.getElementById('psa-drop').classList.add('has-file');
+  document.getElementById('psa-drop-label').textContent = f.name.length > 34 ? f.name.slice(0,32)+'\u2026' : f.name;
+  document.getElementById('psa-drop-sub').textContent   = (f.size/1024).toFixed(0)+' KB \u2014 ready to analyse';
+  psaValidate();
+}
+function psaValidate() {
+  const ok = (psaTab === 'upload' && psaFile) || (psaTab === 'paste' && document.getElementById('psa-paste-area').value.trim().length > 30);
+  document.getElementById('psa-btn-analyse').disabled = !ok;
+}
+ 
+function psaAnimateSteps() {
+  const ids = ['psa-s1','psa-s2','psa-s3','psa-s4']; let i = 0;
+  document.getElementById(ids[0]).className = 'psa-step active';
+  return setInterval(() => {
+    document.getElementById(ids[i]).className = 'psa-step done'; i++;
+    if (i < ids.length) document.getElementById(ids[i]).className = 'psa-step active';
+  }, 2800);
+}
+ 
+function psaToB64(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
+}
+ 
+async function psaRunAnalysis() {
+  document.getElementById('psa-error').classList.remove('show');
+  document.getElementById('psa-upload-panel').style.display = 'none';
+  document.getElementById('psa-loading-panel').classList.add('show');
+  const iv = psaAnimateSteps();
+ 
+  const system = `You are a senior payments consultant based in Australia with 15+ years analysing merchant statements. Analyse the provided merchant statement and return ONLY valid JSON with no markdown, no backticks, no preamble.
+ 
+Return this exact structure:
+{
+  "provider": "string",
+  "period": "string",
+  "volume": number_or_null,
+  "transactions": number_or_null,
+  "totalFees": number_or_null,
+  "effectiveRate": number_or_null,
+  "perTransactionFee": number_or_null,
+  "monthlyFee": number_or_null,
+  "terminalFees": number_or_null,
+  "pricingModel": "blended|ic_plus|ic_plusplus|unknown",
+  "lcrStatus": "on|off|unknown",
+  "feeBreakdown": [{"label":"string","amount":number,"note":"string_or_null"}],
+  "alerts": [{"type":"warn|good|info","heading":"string","body":"string"}],
+  "executiveSummary": "2-3 sentence plain-English summary",
+  "pricingModelAnalysis": "2-3 paragraphs on their pricing model",
+  "savingsOpportunity": "Specific quantified savings with maths",
+  "lcrAnalysis": "LCR status and impact",
+  "keyRecommendation": "Single most important next step",
+  "nextSteps": ["step 1","step 2","step 3"],
+  "benchmarkComment": "How their rate compares to AU market 2025/2026"
+}`;
+ 
+  try {
+    let content = [];
+    if (psaTab === 'paste') {
+      content = [{ type:'text', text:'Analyse this merchant statement:\n\n'+document.getElementById('psa-paste-area').value.trim() }];
+    } else {
+      const b64 = await psaToB64(psaFile);
+      const mt  = psaFile.type === 'application/pdf' ? 'application/pdf' : psaFile.type;
+      content = [
+        psaFile.type === 'application/pdf'
+          ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } }
+          : { type:'image',    source:{ type:'base64', media_type:mt, data:b64 } },
+        { type:'text', text:'Analyse this merchant statement and return only JSON.' }
+      ];
+    }
+ 
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': PSA_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, system, messages:[{ role:'user', content }] })
+    });
+ 
+    if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error '+res.status); }
+    const data = await res.json();
+    const raw  = (data.content.find(b=>b.type==='text')?.text||'').replace(/```json|```/g,'').trim();
+    const d    = JSON.parse(raw);
+ 
+    clearInterval(iv);
+    ['psa-s1','psa-s2','psa-s3','psa-s4'].forEach(id => document.getElementById(id).className='psa-step done');
+ 
+    setTimeout(() => {
+      document.getElementById('psa-loading-panel').classList.remove('show');
+      psaRenderReport(d);
+      document.getElementById('psa-report-panel').classList.add('show');
+    }, 400);
+ 
+  } catch(err) {
+    clearInterval(iv);
+    document.getElementById('psa-loading-panel').classList.remove('show');
+    document.getElementById('psa-upload-panel').style.display = '';
+    const eb = document.getElementById('psa-error');
+    eb.textContent = 'Analysis failed: '+err.message+'. Try the Paste text tab and copy your statement data manually.';
+    eb.classList.add('show');
+  }
+}
+ 
+const psaFmt$ = n => n!=null ? '$'+Number(n).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}) : '\u2014';
+const psaFmtP = n => n!=null ? n.toFixed(2)+'%' : '\u2014';
+const psaFmtN = n => n!=null ? Number(n).toLocaleString('en-AU') : '\u2014';
+const lcrMap  = {on:'Active \u2713', off:'Off \u2717', unknown:'Unknown'};
+function psaAlertIcon(t) {
+  if(t==='warn') return '<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  if(t==='good') return '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+  return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+}
+ 
+function psaRenderReport(d) {
+  const saving = d.effectiveRate && d.effectiveRate > 1.4 && d.volume ? (d.effectiveRate-1.4)/100*d.volume*12 : null;
+  const ml = {blended:'Blended',ic_plus:'Interchange+',ic_plusplus:'Interchange++',unknown:'Unknown'}[d.pricingModel]||'Unknown';
+ 
+  document.getElementById('psa-r-title').textContent   = (d.provider||'Statement')+' \u2014 '+(d.period||'Review');
+  document.getElementById('psa-r-meta').textContent    = 'Generated '+new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('psa-r-rate').textContent    = psaFmtP(d.effectiveRate);
+  document.getElementById('psa-r-fees').textContent    = psaFmt$(d.totalFees);
+  document.getElementById('psa-r-saving').textContent  = saving && saving>500 ? '$'+Math.round(saving).toLocaleString() : '\u2014';
+ 
+  let html = '';
+  html += `<div class="psa-section"><div class="psa-section-label">Executive Summary</div><div class="psa-section-text">${d.executiveSummary||''}</div></div>`;
+  html += `<div class="psa-section"><div class="psa-section-label">Statement Data</div><table class="psa-table">
+    <tr><td>Card volume</td><td>${psaFmt$(d.volume)}</td></tr>
+    <tr><td>Transactions</td><td>${psaFmtN(d.transactions)}</td></tr>
+    <tr><td>Total fees</td><td>${psaFmt$(d.totalFees)}</td></tr>
+    <tr><td>Effective rate</td><td>${psaFmtP(d.effectiveRate)}</td></tr>
+    ${d.perTransactionFee!=null?`<tr><td>Per-transaction fee</td><td>${d.perTransactionFee}\u00a2</td></tr>`:''}
+    ${d.monthlyFee!=null?`<tr><td>Monthly fee</td><td>${psaFmt$(d.monthlyFee)}</td></tr>`:''}
+    ${d.terminalFees!=null?`<tr><td>Terminal fees</td><td>${psaFmt$(d.terminalFees)}</td></tr>`:''}
+    <tr><td>Pricing model</td><td>${ml}</td></tr>
+    <tr><td>LCR status</td><td>${lcrMap[d.lcrStatus]||'\u2014'}</td></tr>
+  </table></div>`;
+  if (d.alerts?.length) html += `<div class="psa-section"><div class="psa-section-label">Key Findings</div>${d.alerts.map(a=>`<div class="psa-alert ${a.type}">${psaAlertIcon(a.type)}<div><strong>${a.heading}</strong>${a.body}</div></div>`).join('')}</div>`;
+  if (d.pricingModelAnalysis) html += `<div class="psa-section"><div class="psa-section-label">Pricing Model</div><div class="psa-section-h">You are on <em>${ml}</em> pricing.</div><div class="psa-section-text">${d.pricingModelAnalysis}</div></div>`;
+  if (d.savingsOpportunity)   html += `<div class="psa-section"><div class="psa-section-label">Savings Opportunity</div><div class="psa-section-text">${d.savingsOpportunity}</div></div>`;
+  if (d.lcrAnalysis)          html += `<div class="psa-section"><div class="psa-section-label">Least-Cost Routing</div><div class="psa-section-text">${d.lcrAnalysis}</div></div>`;
+  if (d.benchmarkComment)     html += `<div class="psa-section"><div class="psa-section-label">Market Benchmark</div><div class="psa-section-text">${d.benchmarkComment}</div></div>`;
+  html += `<div class="psa-section"><div class="psa-rec"><div class="psa-rec-label">Recommendation</div><div class="psa-rec-h">${d.keyRecommendation||''}</div>${d.nextSteps?.length?`<ol class="psa-rec-steps">${d.nextSteps.map(s=>`<li>${s}</li>`).join('')}</ol>`:''}</div></div>`;
+ 
+  document.getElementById('psa-r-body').innerHTML = html;
+}
+ 
+function psaDownload() {
+  const w = window.open('','_blank');
+  const rh = document.getElementById('psa-report-panel').querySelector('.psa-report-header').outerHTML;
+  const rb = document.getElementById('psa-r-body').innerHTML;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Statement Analysis</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#fff;color:#111;max-width:700px;margin:0 auto;padding:40px 28px}
+  .psa-report-header{background:#111827;border-radius:14px;padding:28px;margin-bottom:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .psa-report-eyebrow{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:8px}
+  .psa-report-title{font-family:'DM Serif Display',serif;font-size:22px;color:#fff;margin-bottom:4px}
+  .psa-report-meta{font-size:12px;color:rgba(255,255,255,.28)}
+  .psa-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:20px;background:rgba(255,255,255,.07);border-radius:10px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .psa-stat{padding:14px;background:rgba(255,255,255,.04);text-align:center}
+  .psa-stat-val{font-size:17px;font-weight:700;color:#fff;display:block;margin-bottom:3px}.psa-stat-val.good{color:#4de8a4}
+  .psa-stat-lbl{font-size:10px;color:rgba(255,255,255,.28);text-transform:uppercase;letter-spacing:.09em}
+  .psa-report-body{background:#f8f8f6;border-radius:14px;margin-top:4px;padding:0 28px}
+  .psa-section{padding:20px 0;border-bottom:1px solid rgba(0,0,0,.07)}.psa-section:last-child{border-bottom:none}
+  .psa-section-label{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,0,0,.35);margin-bottom:10px}
+  .psa-section-h{font-family:'DM Serif Display',serif;font-size:17px;color:#111;margin-bottom:8px}
+  .psa-section-text{font-size:13px;line-height:1.75;color:rgba(0,0,0,.55);white-space:pre-line}
+  .psa-table{width:100%;border-collapse:collapse}.psa-table td{padding:9px 0;border-bottom:1px solid rgba(0,0,0,.07);font-size:13px}
+  .psa-table td:last-child{text-align:right;font-weight:500}.psa-table tr:last-child td{border-bottom:none}
+  .psa-alert{border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;font-size:13px;line-height:1.6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .psa-alert.warn{background:#fdf6e3;border-left:3px solid #c8960c}.psa-alert.good{background:#e6f4ed;border-left:3px solid #0a7a52}.psa-alert.info{background:#eef3ff;border-left:3px solid #1a5cff}
+  .psa-alert strong{display:block;font-weight:600;margin-bottom:3px}
+  .psa-alert svg{width:14px;height:14px;flex-shrink:0;margin-top:2px;stroke:currentColor;stroke-width:2;fill:none}
+  .psa-rec{background:#111827;border-radius:12px;padding:20px;margin-top:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .psa-rec-label{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6fa8ff;margin-bottom:8px}
+  .psa-rec-h{font-family:'DM Serif Display',serif;font-size:16px;color:#fff;margin-bottom:10px}
+  .psa-rec-steps{margin-top:12px;padding-left:18px}.psa-rec-steps li{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:6px}
+  @media print{body{padding:20px}}</style></head>
+  <body>${rh}<div class="psa-report-body">${rb}</div></body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 700);
+}
+ 
+function psaReset() {
+  psaFile = null;
+  document.getElementById('psa-report-panel').classList.remove('show');
+  document.getElementById('psa-upload-panel').style.display = '';
+  document.getElementById('psa-btn-analyse').disabled = true;
+  document.getElementById('psa-drop').classList.remove('has-file');
+  document.getElementById('psa-drop-label').textContent = 'Drop your statement here';
+  document.getElementById('psa-drop-sub').textContent   = 'or tap to browse';
+  document.getElementById('psa-file-input').value = '';
+  document.getElementById('psa-paste-area').value = '';
+  document.getElementById('psa-error').classList.remove('show');
+  ['psa-s1','psa-s2','psa-s3','psa-s4'].forEach((id,i) => {
+    document.getElementById(id).className = i===0 ? 'psa-step active' : 'psa-step';
+  });
+}
 </script>
 </body>
 </html>
