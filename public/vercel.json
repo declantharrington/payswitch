@@ -3,5 +3,8 @@
     "api/submit.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/api/submit", "destination": "/api/submit.js" }
+  ]
 }
