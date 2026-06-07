@@ -745,6 +745,35 @@
   color: rgba(255, 255, 255, 0.28);
   letter-spacing: 0.04em;
 }
+/* ── CYCLING HEADLINE ── */
+.cycler-wrap {
+  display: inline-block;
+  position: relative;
+  min-width: 320px;
+  height: 1.2em;
+  vertical-align: bottom;
+}
+
+.cycler-word {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  font-size: 1.25em;
+  color: var(--blue-glow);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+  pointer-events: none;
+  text-shadow: 0 0 40px rgba(58,138,255,0.4);
+}
+
+.cycler-word.active {
+  opacity: 1;
+  transform: translateY(0);
+}
 
 </style>
 </head>
@@ -804,9 +833,23 @@
 
 <!-- OUTRO -->
 <section class="outro-section">
-  <h2 class="outro-headline">Your payments program has problems you don't know about yet</h2>
+  <h2 class="outro-headline">
+    The power of AI, designed to review your
+    <br>
+    <span class="cycler-wrap">
+      <span class="cycler-word active">payments</span>
+      <span class="cycler-word">gateway</span>
+      <span class="cycler-word">acquirer</span>
+      <span class="cycler-word">PSP</span>
+      <span class="cycler-word">fraud tool</span>
+      <span class="cycler-word">risk</span>
+      <span class="cycler-word">routing</span>
+      <span class="cycler-word">reporting</span>
+      <span class="cycler-word">checkout</span>
+    </span>
+  </h2>
   <p class="outro-sub">Provide a short overview of your payments program. Our AI identifies where you are overpaying, every point where revenue is leaking, and every gap in your payments infrastructure - then an expert walks you through exactly what to fix and how to do it at no cost to you.</p>
-  <a href="#" class="hero-cta-btn">
+  <a href="/analyser.html" class="hero-cta-btn">
     Start for free
     <span class="cta-arrow"></span>
   </a>
@@ -1063,6 +1106,19 @@ document.addEventListener('keydown', (event) => {
 applyTransforms();
 preloadCarouselImages();
 requestCarouselUpdate();
+
+// ── Cycling headline ──────────────────────────────────────────────
+(function() {
+  const words = document.querySelectorAll('.cycler-word');
+  if (!words.length) return;
+  let current = 0;
+  setInterval(function() {
+    words[current].classList.remove('active');
+    current = (current + 1) % words.length;
+    words[current].classList.add('active');
+  }, 2200);
+})(); 
+ 
 </script>
 </body>
 </html>
