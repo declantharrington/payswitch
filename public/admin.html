@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payswitch — Submissions Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #0a0a0f; color: #f0f0f5; min-height: 100vh; }
+
+/* ── NAV ── */
+.nav {
+  height: 56px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 32px; background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.07); position: sticky; top: 0; z-index: 100;
+}
+.nav-title { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+.nav-title span { color: #1a5cff; }
+.nav-badge {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  background: rgba(26,92,255,0.15); color: #6fa8ff; padding: 4px 10px; border-radius: 100px;
+}
+
+/* ── MAIN ── */
+.main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+.page-header { margin-bottom: 28px; }
+.page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 6px; }
+.page-sub { font-size: 14px; color: rgba(255,255,255,0.4); }
+
+/* ── STATS ROW ── */
+.stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 28px; }
+.stat-card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px; padding: 18px 20px;
+}
+.stat-card-val { font-size: 26px; font-weight: 700; letter-spacing: -0.04em; margin-bottom: 4px; }
+.stat-card-lbl { font-size: 12px; color: rgba(255,255,255,0.35); font-weight: 500; }
+
+/* ── FILTERS ── */
+.filters { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.filter-btn {
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
+  padding: 7px 14px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.1);
+  background: none; color: rgba(255,255,255,0.45); cursor: pointer; transition: all 0.15s;
+}
+.filter-btn.active { background: rgba(26,92,255,0.15); border-color: rgba(26,92,255,0.4); color: #6fa8ff; }
+.filter-btn:hover:not(.active) { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); }
+
+/* ── TABLE ── */
+.table-wrap {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px; overflow: hidden;
+}
+.table-header {
+  display: grid; grid-template-columns: 180px 120px 100px 100px 130px 120px 1fr;
+  padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255,255,255,0.28);
+}
+.table-row {
+  display: grid; grid-template-columns: 180px 120px 100px 100px 130px 120px 1fr;
+  padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  align-items: center; transition: background 0.15s; cursor: pointer;
+}
+.table-row:last-child { border-bottom: none; }
+.table-row:hover { background: rgba(255,255,255,0.03); }
+.table-cell { font-size: 13px; color: rgba(255,255,255,0.75); }
+.table-cell.primary { font-weight: 600; color: white; }
+.table-cell.muted { color: rgba(255,255,255,0.35); font-size: 12px; }
+
+.status-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px;
+}
+.status-badge.pending { background: rgba(200,150,12,0.15); color: #c8960c; }
+.status-badge.reviewed { background: rgba(10,122,82,0.15); color: #4de8a4; }
+.status-badge.sent { background: rgba(26,92,255,0.15); color: #6fa8ff; }
+
+.rate-pill {
+  display: inline-block; font-size: 12px; font-weight: 600;
+  padding: 3px 9px; border-radius: 100px;
+}
+.rate-pill.high { background: rgba(192,57,43,0.15); color: #ff8a80; }
+.rate-pill.mid  { background: rgba(200,150,12,0.15); color: #c8960c; }
+.rate-pill.low  { background: rgba(10,122,82,0.15); color: #4de8a4; }
+
+.view-btn {
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
+  padding: 6px 14px; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6);
+  border: none; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+}
+.view-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+
+.empty-state {
+  text-align: center; padding: 60px 20px;
+  color: rgba(255,255,255,0.25); font-size: 14px;
+}
+.empty-state h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; color: rgba(255,255,255,0.4); }
+
+/* ── MODAL ── */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  display: none; align-items: flex-start; justify-content: center;
+  padding: 40px 20px; overflow-y: auto;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: #13131a; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; width: 100%; max-width: 720px;
+  position: relative; margin: auto;
+}
+.modal-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); border: none; cursor: pointer;
+  color: rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: background 0.15s;
+}
+.modal-close:hover { background: rgba(255,255,255,0.14); }
+.modal-header {
+  background: linear-gradient(135deg,#0d1628 0%,#111827 100%);
+  padding: 28px 32px; border-radius: 20px 20px 0 0;
+}
+.modal-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 8px; }
+.modal-title { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; color: white; margin-bottom: 4px; }
+.modal-meta { font-size: 12px; color: rgba(255,255,255,0.3); }
+.modal-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; margin-top: 18px; background: rgba(255,255,255,0.07); border-radius: 10px; overflow: hidden; }
+.modal-stat { padding: 12px; background: rgba(255,255,255,0.04); text-align: center; }
+.modal-stat-val { font-size: 16px; font-weight: 700; color: white; display: block; margin-bottom: 3px; }
+.modal-stat-lbl { font-size: 10px; color: rgba(255,255,255,0.28); text-transform: uppercase; letter-spacing: 0.09em; }
+.modal-body { padding: 24px 32px 32px; }
+.modal-section { padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.modal-section:last-child { border-bottom: none; }
+.modal-section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 10px; }
+.modal-section-text { font-size: 13px; line-height: 1.72; color: rgba(255,255,255,0.55); white-space: pre-line; }
+.modal-table { width: 100%; border-collapse: collapse; }
+.modal-table td { padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13px; }
+.modal-table td:first-child { color: rgba(255,255,255,0.4); }
+.modal-table td:last-child { text-align: right; font-weight: 500; color: rgba(255,255,255,0.8); }
+.modal-table tr:last-child td { border-bottom: none; }
+.modal-alert { border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; }
+.modal-alert.warn { background: rgba(200,150,12,0.1); border-left: 3px solid #c8960c; color: rgba(255,255,255,0.65); }
+.modal-alert.good { background: rgba(10,122,82,0.1); border-left: 3px solid #0a7a52; color: rgba(255,255,255,0.65); }
+.modal-alert.info { background: rgba(26,92,255,0.1); border-left: 3px solid #1a5cff; color: rgba(255,255,255,0.65); }
+.modal-alert strong { font-weight: 600; display: block; margin-bottom: 3px; color: rgba(255,255,255,0.85); }
+.modal-rec { background: rgba(26,92,255,0.08); border: 1px solid rgba(26,92,255,0.2); border-radius: 12px; padding: 20px; }
+.modal-rec-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6fa8ff; margin-bottom: 8px; }
+.modal-rec-h { font-size: 16px; font-weight: 600; color: white; margin-bottom: 10px; line-height: 1.3; }
+.modal-rec-steps { padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.modal-rec-steps li { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.6; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+.btn-mark-reviewed {
+  background: rgba(10,122,82,0.15); color: #4de8a4; border: 1px solid rgba(10,122,82,0.3);
+  border-radius: 10px; padding: 10px 18px; font-family: 'Inter', sans-serif;
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s;
+}
+.btn-mark-reviewed:hover { background: rgba(10,122,82,0.25); }
+.btn-mark-sent {
+  background: rgba(26,92,255,0.15); color: #6fa8ff; border: 1px solid rgba(26,92,255,0.3);
+  border-radius: 10px; padding: 10px 18px; font-family: 'Inter', sans-serif;
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s;
+}
+.btn-mark-sent:hover { background: rgba(26,92,255,0.25); }
+.program-box { background: rgba(255,255,255,0.04); border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.7; color: rgba(255,255,255,0.5); }
+
+.loading-spinner { text-align: center; padding: 60px 20px; color: rgba(255,255,255,0.3); font-size: 14px; }
+
+@media (max-width: 900px) {
+  .table-header, .table-row { grid-template-columns: 1fr 100px 100px 100px; }
+  .table-header > *:nth-child(n+5),
+  .table-row > *:nth-child(n+5) { display: none; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-title">pay<span>switch</span> <span style="color:rgba(255,255,255,0.3);font-weight:400;margin:0 8px">·</span> Submissions</div>
+  <div class="nav-badge" id="nav-count">Loading...</div>
+</nav>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Submission Dashboard</div>
+    <div class="page-sub">Review AI-generated reports before they're shared with merchants.</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-card-val" id="stat-total">—</div>
+      <div class="stat-card-lbl">Total submissions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-val" style="color:#c8960c" id="stat-pending">—</div>
+      <div class="stat-card-lbl">Pending review</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-val" style="color:#4de8a4" id="stat-reviewed">—</div>
+      <div class="stat-card-lbl">Reviewed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-val" style="color:#6fa8ff" id="stat-sent">—</div>
+      <div class="stat-card-lbl">Sent to client</div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <button class="filter-btn active" onclick="filterSubmissions('all',this)">All</button>
+    <button class="filter-btn" onclick="filterSubmissions('pending_review',this)">Pending review</button>
+    <button class="filter-btn" onclick="filterSubmissions('reviewed',this)">Reviewed</button>
+    <button class="filter-btn" onclick="filterSubmissions('sent',this)">Sent to client</button>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-header">
+      <div>Provider / Period</div>
+      <div>Volume</div>
+      <div>Eff. Rate</div>
+      <div>Fees</div>
+      <div>Submitted</div>
+      <div>Status</div>
+      <div></div>
+    </div>
+    <div id="submissions-list">
+      <div class="loading-spinner">Loading submissions...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="modal-bg" id="modal-bg" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <button class="modal-close" onclick="closeModalBtn()">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://lnelbjisofzeufihtzlp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZWxiamlzb2Z6ZXVmaWh0emxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MDIxNzMsImV4cCI6MjA5NjM3ODE3M30.BekqvtOv4S--6J-LyD9Pe4JgRBYUQImuuj5egyoKhhw';
+
+let allSubmissions = [];
+let currentFilter = 'all';
+
+const fmtD = n => n != null ? '$'+Number(n).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+const fmtP = n => n != null ? Number(n).toFixed(2)+'%' : '—';
+
+async function loadSubmissions() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/submissions?order=submitted_at.desc&limit=100`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    allSubmissions = await res.json();
+    updateStats();
+    renderTable(allSubmissions);
+  } catch(err) {
+    document.getElementById('submissions-list').innerHTML =
+      '<div class="empty-state"><h3>Could not load submissions</h3><p>'+err.message+'</p></div>';
+  }
+}
+
+function updateStats() {
+  const total    = allSubmissions.length;
+  const pending  = allSubmissions.filter(s => s.status === 'pending_review').length;
+  const reviewed = allSubmissions.filter(s => s.status === 'reviewed').length;
+  const sent     = allSubmissions.filter(s => s.status === 'sent').length;
+  document.getElementById('stat-total').textContent    = total;
+  document.getElementById('stat-pending').textContent  = pending;
+  document.getElementById('stat-reviewed').textContent = reviewed;
+  document.getElementById('stat-sent').textContent     = sent;
+  document.getElementById('nav-count').textContent     = pending + ' pending';
+}
+
+function filterSubmissions(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = filter === 'all' ? allSubmissions : allSubmissions.filter(s => s.status === filter);
+  renderTable(filtered);
+}
+
+function ratePillClass(rate) {
+  if (!rate) return '';
+  if (rate > 1.7) return 'high';
+  if (rate > 1.3) return 'mid';
+  return 'low';
+}
+
+function renderTable(submissions) {
+  if (!submissions.length) {
+    document.getElementById('submissions-list').innerHTML =
+      '<div class="empty-state"><h3>No submissions yet</h3><p>They\'ll appear here as merchants submit their statements.</p></div>';
+    return;
+  }
+  document.getElementById('submissions-list').innerHTML = submissions.map(s => {
+    const date = new Date(s.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+    const rateClass = ratePillClass(s.effective_rate);
+    const statusMap = { pending_review:'pending', reviewed:'reviewed', sent:'sent' };
+    const statusLabel = { pending_review:'Pending review', reviewed:'Reviewed', sent:'Sent to client' };
+    return `<div class="table-row" onclick="openSubmission('${s.id}')">
+      <div class="table-cell primary">${s.provider||'Unknown'}<div class="table-cell muted" style="margin-top:2px">${s.period||'—'}</div></div>
+      <div class="table-cell">${fmtD(s.volume)}</div>
+      <div class="table-cell">${s.effective_rate ? `<span class="rate-pill ${rateClass}">${fmtP(s.effective_rate)}</span>` : '—'}</div>
+      <div class="table-cell">${fmtD(s.total_fees)}</div>
+      <div class="table-cell muted">${date}</div>
+      <div class="table-cell"><span class="status-badge ${statusMap[s.status]||'pending'}">${statusLabel[s.status]||'Pending'}</span></div>
+      <div class="table-cell"><button class="view-btn" onclick="event.stopPropagation();openSubmission('${s.id}')">View →</button></div>
+    </div>`;
+  }).join('');
+}
+
+function openSubmission(id) {
+  const s = allSubmissions.find(x => x.id == id);
+  if (!s) return;
+  const report = s.report_json ? JSON.parse(s.report_json) : {};
+  const date = new Date(s.submitted_at).toLocaleString('en-AU',{dateStyle:'long',timeStyle:'short'});
+
+  const alertsHtml = report.alerts?.map(a =>
+    `<div class="modal-alert ${a.type}"><strong>${a.heading}</strong>${a.body}</div>`
+  ).join('') || '';
+
+  let html = `
+    <div class="modal-header">
+      <div class="modal-eyebrow">Submission #${s.id} · ${date}</div>
+      <div class="modal-title">${s.provider||'Unknown'} — ${s.period||'Review'}</div>
+      <div class="modal-meta">Status: ${s.status||'pending_review'}</div>
+      <div class="modal-stats">
+        <div class="modal-stat"><span class="modal-stat-val">${fmtP(s.effective_rate)}</span><span class="modal-stat-lbl">Eff. rate</span></div>
+        <div class="modal-stat"><span class="modal-stat-val">${fmtD(s.total_fees)}</span><span class="modal-stat-lbl">Total fees</span></div>
+        <div class="modal-stat"><span class="modal-stat-val">${s.pricing_model||'—'}</span><span class="modal-stat-lbl">Model</span></div>
+      </div>
+    </div>
+    <div class="modal-body">
+      ${report.executiveSummary ? `<div class="modal-section"><div class="modal-section-label">Executive Summary</div><div class="modal-section-text">${report.executiveSummary}</div></div>` : ''}
+      <div class="modal-section">
+        <div class="modal-section-label">Statement Data</div>
+        <table class="modal-table">
+          <tr><td>Card volume</td><td>${fmtD(s.volume)}</td></tr>
+          <tr><td>Total fees</td><td>${fmtD(s.total_fees)}</td></tr>
+          <tr><td>Effective rate</td><td>${fmtP(s.effective_rate)}</td></tr>
+          <tr><td>Pricing model</td><td>${s.pricing_model||'—'}</td></tr>
+          <tr><td>LCR status</td><td>${s.lcr_status||'—'}</td></tr>
+        </table>
+      </div>
+      ${alertsHtml ? `<div class="modal-section"><div class="modal-section-label">Key Findings</div>${alertsHtml}</div>` : ''}
+      ${s.program_context ? `<div class="modal-section"><div class="modal-section-label">Program Description</div><div class="program-box">${s.program_context.replace(/\n/g,'<br>')}</div></div>` : ''}
+      ${report.savingsOpportunity ? `<div class="modal-section"><div class="modal-section-label">Savings Opportunity</div><div class="modal-section-text">${report.savingsOpportunity}</div></div>` : ''}
+      ${report.pricingModelAnalysis ? `<div class="modal-section"><div class="modal-section-label">Pricing Model Analysis</div><div class="modal-section-text">${report.pricingModelAnalysis}</div></div>` : ''}
+      ${report.lcrAnalysis ? `<div class="modal-section"><div class="modal-section-label">LCR Analysis</div><div class="modal-section-text">${report.lcrAnalysis}</div></div>` : ''}
+      ${report.benchmarkComment ? `<div class="modal-section"><div class="modal-section-label">Market Benchmark</div><div class="modal-section-text">${report.benchmarkComment}</div></div>` : ''}
+      ${report.keyRecommendation ? `
+      <div class="modal-section">
+        <div class="modal-rec">
+          <div class="modal-rec-label">Recommendation</div>
+          <div class="modal-rec-h">${report.keyRecommendation}</div>
+          ${report.nextSteps?.length ? `<ol class="modal-rec-steps">${report.nextSteps.map(s=>`<li>${s}</li>`).join('')}</ol>` : ''}
+        </div>
+      </div>` : ''}
+      <div class="modal-section">
+        <div class="modal-section-label">Update Status</div>
+        <div class="modal-actions">
+          <button class="btn-mark-reviewed" onclick="updateStatus('${s.id}','reviewed')">✓ Mark as reviewed</button>
+          <button class="btn-mark-sent" onclick="updateStatus('${s.id}','sent')">→ Mark as sent to client</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-bg').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+async function updateStatus(id, status) {
+  await fetch(`${SUPABASE_URL}/rest/v1/submissions?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`
+    },
+    body: JSON.stringify({ status })
+  });
+  // Update locally
+  const s = allSubmissions.find(x => x.id == id);
+  if (s) s.status = status;
+  updateStats();
+  renderTable(currentFilter === 'all' ? allSubmissions : allSubmissions.filter(s => s.status === currentFilter));
+  closeModalBtn();
+}
+
+function closeModal(e) { if (e.target === document.getElementById('modal-bg')) closeModalBtn(); }
+function closeModalBtn() {
+  document.getElementById('modal-bg').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
+
+loadSubmissions();
+// Refresh every 60 seconds
+setInterval(loadSubmissions, 60000);
+</script>
+</body>
+</html>
