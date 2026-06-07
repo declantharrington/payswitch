@@ -3,1109 +3,1013 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Payswitch — Statement Analyser Preview</title>
+<title>Payswitch — Payments Review</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* ── PAGE STYLES ── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; }
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #020408; color: #F0F4FF;
-  min-height: 100vh; -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+/* ── TOKENS ── */
+:root {
+  --black:       #020408;
+  --blue:        #1A6BFF;
+  --blue-glow:   #3A8AFF;
+  --blue-dim:    rgba(26, 107, 255, 0.15);
+  --glass:       rgba(255,255,255,0.04);
+  --glass-border:rgba(255,255,255,0.08);
+  --text-primary:#F0F4FF;
+  --text-muted:  rgba(200, 210, 240, 0.55);
+  /* Aliases for this page */
+  --bg:      #020408;
+  --white:   #F0F4FF;
+  --muted:   rgba(200, 210, 240, 0.55);
+  --border:  rgba(255,255,255,0.08);
+  --glow:    #3A8AFF;
+  --sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--sans); background: var(--black); color: var(--text-primary);
+  -webkit-font-smoothing: antialiased; cursor: default;
+}
+
+/* ── NOISE ── */
 body::after {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.45;
 }
-.page-wrap {
-  min-height: 100vh; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 80px 24px; text-align: center; position: relative; z-index: 1;
+
+/* ── AMBIENT GLOW ── */
+.ambient {
+  position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+  background: radial-gradient(circle, rgba(26,107,255,0.08) 0%, transparent 70%);
 }
-.page-eyebrow {
-  display: inline-flex; align-items: center; gap: 10px;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.18em;
-  text-transform: uppercase; color: #3A8AFF; margin-bottom: 28px;
+.ambient-1 { width: 700px; height: 700px; top: -200px; right: -200px; }
+.ambient-2 { width: 500px; height: 500px; bottom: -150px; left: -100px; opacity: 0.6; }
+
+/* ── CHROME ── */
+.chrome {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 60px;
+  background: rgba(2, 4, 8, 0.7);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
 }
-.page-eyebrow::before, .page-eyebrow::after {
-  content: ''; display: block; width: 36px; height: 1px; background: #3A8AFF; opacity: 0.5;
+
+
+.progress-track {
+  display: flex; align-items: center; gap: 6px;
 }
-.page-h1 {
-  font-family: 'Manrope', sans-serif;
-  font-size: clamp(42px, 7vw, 80px); font-weight: 800;
-  line-height: 1.08; letter-spacing: -0.04em; color: #fff;
-  max-width: 800px; margin: 0 auto 24px;
-  text-shadow: 0 0 60px rgba(58,138,255,0.3), 0 0 120px rgba(58,138,255,0.12);
+.progress-pip {
+  width: 24px; height: 3px; border-radius: 2px;
+  background: rgba(255,255,255,0.1); transition: all 0.4s ease;
 }
-.page-h1 .grad {
-  display: inline-block;
-  background: linear-gradient(90deg,#fff 0%,#b7d3ff 20%,#1A6BFF 50%,#6aa7ff 80%,#fff 100%);
-  background-size: 300% 100%; -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent; animation: shimmer 8s linear infinite;
+.progress-pip.done { background: var(--blue); }
+.progress-pip.active { background: var(--blue-glow); width: 32px; box-shadow: 0 0 8px rgba(58,138,255,0.5); }
+
+/* ── STAGE ── */
+.stage {
+  position: fixed; inset: 0; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 80px 40px 80px;
 }
-@keyframes shimmer { from{background-position:0% 0%} to{background-position:300% 0%} }
-.page-sub {
-  font-size: 18px; font-weight: 300; color: rgba(200,210,240,0.55);
-  max-width: 500px; margin: 0 auto 48px; line-height: 1.65;
+
+/* ── SCREENS ── */
+.screen {
+  position: absolute; width: 100%; max-width: 620px;
+  opacity: 0; pointer-events: none;
+  transform: translateX(48px);
+  transition: opacity 0.45s cubic-bezier(0.22,1,0.36,1),
+              transform 0.45s cubic-bezier(0.22,1,0.36,1);
 }
-.page-btn {
-  display: inline-flex; align-items: center; gap: 12px;
-  background: linear-gradient(135deg,#1A6BFF,#4A90FF); color: white;
-  text-decoration: none; font-family: 'Inter', sans-serif;
-  font-size: 16px; font-weight: 600; letter-spacing: 0.01em;
-  padding: 18px 44px; border-radius: 8px; border: none; cursor: pointer;
+.screen.active {
+  opacity: 1; pointer-events: all; transform: translateX(0);
+}
+.screen.exit {
+  opacity: 0; transform: translateX(-48px); pointer-events: none;
+}
+
+/* ── QUESTION TYPOGRAPHY ── */
+
+.q-text {
+  font-family: 'Manrope', sans-serif; font-size: clamp(32px, 4.5vw, 52px);
+  font-weight: 800; line-height: 1.08; letter-spacing: -0.04em;
+  color: #FFFFFF; margin-bottom: 10px;
+  text-shadow:
+    0 0 60px rgba(58,138,255,0.35),
+    0 0 120px rgba(58,138,255,0.15),
+    0 0 200px rgba(58,138,255,0.08);
+}
+
+.q-sub {
+  font-size: 15px; color: var(--text-muted); line-height: 1.65;
+  margin-bottom: 36px; max-width: 480px; font-weight: 300;
+}
+
+/* ── TEXT INPUT ── */
+.q-input-wrap {
+  position: relative; margin-bottom: 24px;
+}
+.q-input {
+  width: 100%; background: transparent; border: none;
+  border-bottom: 2px solid var(--glass-border);
+  font-family: var(--serif); font-size: clamp(24px, 3vw, 36px);
+  color: var(--white); padding: 12px 0; outline: none;
+  transition: border-color 0.25s;
+  caret-color: var(--blue-glow);
+}
+.q-input:focus { border-bottom-color: var(--blue-glow); }
+.q-input::placeholder { color: rgba(255,255,255,0.15); }
+
+/* ── OTP INPUT ── */
+.otp-digits {
+  display: flex; gap: 10px; margin-bottom: 8px;
+}
+.otp-digit {
+  width: 52px; height: 64px; background: var(--glass);
+  border: 1px solid var(--glass-border); border-radius: 10px;
+  font-family: var(--serif); font-size: 28px; font-weight: 400;
+  color: var(--white); text-align: center; outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  caret-color: transparent;
+}
+.otp-digit:focus { border-color: var(--blue-glow); background: rgba(26,107,255,0.08); }
+.otp-digit.filled { border-color: rgba(58,138,255,0.4); }
+
+/* ── CHOICE CARDS ── */
+.choice-grid {
+  display: grid; gap: 8px; margin-bottom: 28px;
+}
+.choice-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+.choice-grid.cols-1 { grid-template-columns: 1fr; }
+
+.choice {
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(160deg, rgba(10,16,35,0.95) 0%, rgba(4,8,18,0.98) 100%);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px; padding: 16px 20px; cursor: pointer;
+  transition: all 0.25s; font-family: var(--sans); text-align: left;
   position: relative; overflow: hidden;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-  box-shadow: 0 0 30px rgba(26,107,255,0.45), 0 0 60px rgba(26,107,255,0.18), inset 0 1px 0 rgba(255,255,255,0.15);
 }
-.page-btn::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg,rgba(255,255,255,0.12),transparent); pointer-events: none; }
-.page-btn:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(26,107,255,0.6), 0 0 100px rgba(26,107,255,0.2), inset 0 1px 0 rgba(255,255,255,0.2); }
-.page-btn:active { transform: translateY(0); }
-.page-btn-arrow { font-size: 18px; transition: transform 0.2s; }
-.page-btn:hover .page-btn-arrow { transform: translateX(3px); }
-.page-note { margin-top: 16px; font-size: 12px; color: rgba(255,255,255,0.22); letter-spacing: 0.04em; }
-
-/* ── ANALYSER MODAL — matches Payswitch site design ── */
-#psa-backdrop {
-  position: fixed; inset: 0; z-index: 9999;
-  background: rgba(2,4,8,0.92);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  display: none; align-items: center; justify-content: center;
-  padding: 20px; opacity: 0; transition: opacity 0.25s ease;
-}
-#psa-backdrop.open   { display: flex; }
-#psa-backdrop.visible{ opacity: 1; }
-
-#psa-modal {
-  background: linear-gradient(160deg, rgba(10,16,35,0.98) 0%, rgba(4,8,18,0.99) 100%);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 20px; width: 100%; max-width: 660px;
-  max-height: 90vh; overflow-y: auto; position: relative;
-  transform: translateY(24px);
-  transition: transform 0.35s cubic-bezier(0.22,1,0.36,1);
-  box-shadow: 0 0 0 1px rgba(26,107,255,0.08), 0 40px 120px rgba(0,0,0,0.9), 0 0 80px rgba(26,107,255,0.05);
-}
-#psa-modal::before {
+.choice::before {
   content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, transparent 0%, #1A6BFF 40%, #3A8AFF 60%, transparent 100%);
-  opacity: 0.6; border-radius: 20px 20px 0 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, var(--blue) 40%, var(--blue-glow) 60%, transparent 100%);
+  opacity: 0; transition: opacity 0.25s;
 }
-#psa-backdrop.visible #psa-modal { transform: translateY(0); }
-#psa-modal::-webkit-scrollbar { width: 4px; }
-#psa-modal::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
-
-#psa-close {
-  position: absolute; top: 16px; right: 16px;
-  width: 32px; height: 32px; border-radius: 50%;
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  color: rgba(255,255,255,0.35); z-index: 10; transition: all 0.25s;
+.choice:hover { border-color: rgba(26,107,255,0.25); box-shadow: 0 0 40px rgba(26,107,255,0.06); transform: translateY(-1px); }
+.choice:hover::before { opacity: 0.6; }
+.choice.selected {
+  background: linear-gradient(160deg, rgba(26,107,255,0.12) 0%, rgba(10,16,35,0.95) 100%);
+  border-color: rgba(26,107,255,0.4);
+  box-shadow: 0 0 0 1px rgba(26,107,255,0.15), 0 0 30px rgba(26,107,255,0.08);
 }
-#psa-close:hover { background: rgba(255,255,255,0.1); color: white; border-color: rgba(255,255,255,0.15); }
-#psa-close svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; }
-
-.psa-inner { padding: 40px 36px 44px; }
-
-.psa-eyebrow {
-  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600;
-  letter-spacing: 0.18em; text-transform: uppercase; color: #3A8AFF;
-  margin-bottom: 12px; display: inline-flex; align-items: center; gap: 8px;
+.choice.selected::before { opacity: 1; }
+.choice-icon {
+  width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(26,107,255,0.12), rgba(26,107,255,0.04));
+  border: 1px solid rgba(26,107,255,0.15);
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  transition: all 0.25s;
 }
-.psa-eyebrow::before, .psa-eyebrow::after {
-  content: ''; display: block; width: 24px; height: 1px; background: #3A8AFF; opacity: 0.5;
+.choice.selected .choice-icon { background: linear-gradient(135deg, rgba(26,107,255,0.22), rgba(26,107,255,0.08)); border-color: rgba(26,107,255,0.35); }
+.choice-text { flex: 1; }
+.choice-label { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; font-family: 'Manrope', sans-serif; letter-spacing: -0.01em; }
+.choice-sub { font-size: 12px; color: var(--text-muted); }
+.choice-check {
+  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.15);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
 }
-.psa-title {
-  font-family: 'Manrope', sans-serif; font-size: 30px; line-height: 1.08;
-  color: #fff; margin-bottom: 10px; letter-spacing: -0.04em; font-weight: 800;
+.choice.selected .choice-check {
+  background: var(--blue); border-color: var(--blue);
 }
-.psa-title em {
-  font-style: normal;
-  background: linear-gradient(90deg,#fff 0%,#b7d3ff 20%,#1A6BFF 50%,#6aa7ff 80%,#fff 100%);
-  background-size: 300% 100%; -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent; animation: psaShimmer 6s linear infinite;
-}
-@keyframes psaShimmer { from{background-position:0% 0%} to{background-position:300% 0%} }
-.psa-sub {
-  font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.65;
-  color: rgba(200,210,240,0.55); margin-bottom: 28px;
+.choice.selected .choice-check::after {
+  content: '✓'; font-size: 11px; color: white; font-weight: 700;
 }
 
-.psa-tabs {
-  display: flex; gap: 4px;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px; padding: 4px; margin-bottom: 20px; width: fit-content;
+/* ── UPLOAD ZONE ── */
+.upload-zone {
+  border: 2px dashed rgba(255,255,255,0.1); border-radius: 20px;
+  padding: 56px 32px; text-align: center; cursor: pointer;
+  transition: all 0.3s; background: rgba(255,255,255,0.02);
+  margin-bottom: 16px; position: relative; overflow: hidden;
 }
-.psa-tab {
-  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.01em;
-  color: rgba(200,210,240,0.4); background: none; border: none;
-  border-radius: 6px; padding: 7px 16px; cursor: pointer; transition: all 0.2s;
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--blue); background: rgba(26,107,255,0.05);
 }
-.psa-tab.active { background: rgba(26,107,255,0.15); border: 1px solid rgba(26,107,255,0.3); color: #3A8AFF; }
-
-.psa-drop {
-  border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px;
-  padding: 44px 24px; text-align: center; cursor: pointer;
-  transition: all 0.25s; background: rgba(255,255,255,0.02);
-}
-.psa-drop:hover, .psa-drop.drag-over {
-  border-color: #1A6BFF; background: rgba(26,107,255,0.06);
-  box-shadow: 0 0 30px rgba(26,107,255,0.1);
-}
-.psa-drop.has-file { border-style: solid; border-color: #0a7a52; background: rgba(10,122,82,0.06); }
-.psa-drop-icon {
-  width: 48px; height: 48px; border-radius: 14px;
-  background: linear-gradient(135deg,rgba(26,107,255,0.15),rgba(26,107,255,0.04));
+.upload-icon {
+  width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 18px;
+  background: linear-gradient(135deg, rgba(26,107,255,0.15), rgba(26,107,255,0.04));
   border: 1px solid rgba(26,107,255,0.2);
-  display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.25s, border-color 0.25s;
 }
-.psa-drop-icon svg { width: 22px; height: 22px; stroke: rgba(255,255,255,0.45); stroke-width: 1.5; fill: none; }
-.psa-drop.has-file .psa-drop-icon { background: rgba(10,122,82,0.15); border-color: rgba(10,122,82,0.3); }
-.psa-drop.has-file .psa-drop-icon svg { stroke: #4de8a4; }
-.psa-drop-title { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.6); margin-bottom: 5px; }
-.psa-drop-sub   { font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.35); }
-.psa-drop-formats { font-family: 'Inter', sans-serif; font-size: 11px; color: rgba(200,210,240,0.22); margin-top: 10px; letter-spacing: 0.04em; }
-input#psa-file-input { display: none; }
+.upload-icon svg { width: 24px; height: 24px; stroke: var(--glow); stroke-width: 1.5; fill: none; }
+.upload-title { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin-bottom: 8px; }
+.upload-sub { font-size: 13px; color: var(--text-muted); line-height: 1.65; }
+.upload-formats { font-size: 11px; color: rgba(255,255,255,0.2); margin-top: 12px; letter-spacing: 0.06em; }
+input#fileInput { display: none; }
 
-.psa-paste {
-  width: 100%; min-height: 180px; padding: 16px;
-  font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.65;
-  color: rgba(240,244,255,0.8); background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
-  outline: none; resize: vertical; transition: border-color 0.2s, box-shadow 0.2s;
+.file-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.file-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(10,122,82,0.1); border: 1px solid rgba(10,122,82,0.25);
+  border-radius: 100px; padding: 6px 12px 6px 10px;
+  font-family: var(--sans); font-size: 12px; color: #4de8a4;
 }
-.psa-paste:focus { border-color: rgba(26,107,255,0.5); box-shadow: 0 0 20px rgba(26,107,255,0.08); }
-.psa-paste::placeholder { color: rgba(200,210,240,0.22); }
+.file-chip svg { width: 13px; height: 13px; stroke: #4de8a4; stroke-width: 2; fill: none; }
+.file-chip-remove {
+  background: none; border: none; cursor: pointer; color: rgba(77,232,164,0.5);
+  padding: 0; margin-left: 2px; line-height: 1; font-size: 14px; transition: color 0.15s;
+}
+.file-chip-remove:hover { color: #4de8a4; }
 
-.psa-submit-row { margin-top: 18px; display: flex; align-items: center; gap: 14px; }
-.psa-btn {
-  display: flex; align-items: center; gap: 9px;
-  background: linear-gradient(135deg,#1A6BFF,#4A90FF); color: white; border: none;
-  border-radius: 8px; padding: 14px 28px;
-  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
-  cursor: pointer; letter-spacing: 0.01em; white-space: nowrap;
+/* ── CTA BUTTON ── */
+.cta {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
+  letter-spacing: 0.01em; padding: 16px 36px;
+  background: linear-gradient(135deg, #1A6BFF, #4A90FF);
+  color: white; border: none; border-radius: 8px; cursor: pointer;
+  text-decoration: none; position: relative; overflow: hidden;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
   box-shadow: 0 0 30px rgba(26,107,255,0.4), 0 0 60px rgba(26,107,255,0.15), inset 0 1px 0 rgba(255,255,255,0.15);
-  position: relative; overflow: hidden;
 }
-.psa-btn::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg,rgba(255,255,255,0.12),transparent); pointer-events: none; }
-.psa-btn:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(26,107,255,0.55), 0 0 100px rgba(26,107,255,0.2), inset 0 1px 0 rgba(255,255,255,0.2); }
-.psa-btn:active { transform: translateY(0); }
-.psa-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
-.psa-btn svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2; fill: none; }
-.psa-note { font-family: 'Inter', sans-serif; font-size: 11px; color: rgba(200,210,240,0.28); line-height: 1.55; letter-spacing: 0.01em; }
+.cta::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg,rgba(255,255,255,0.12),transparent); pointer-events: none; }
+.cta:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(26,107,255,0.55), 0 0 100px rgba(26,107,255,0.2), inset 0 1px 0 rgba(255,255,255,0.2); }
+.cta:active { transform: translateY(0); }
+.cta:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
+.cta svg { width: 16px; height: 16px; stroke: white; stroke-width: 2; fill: none; flex-shrink: 0; }
 
-.psa-error {
-  background: rgba(192,57,43,0.1); border: 1px solid rgba(192,57,43,0.25);
-  border-radius: 8px; padding: 14px 16px;
-  font-family: 'Inter', sans-serif; font-size: 13px; color: #ff8a80;
-  display: none; margin-top: 14px; line-height: 1.6;
+.cta-row { display: flex; align-items: center; gap: 16px; }
+.skip-link {
+  font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-muted);
+  background: none; border: none; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 3px; transition: color 0.15s;
 }
-.psa-error.show { display: block; }
+.skip-link:hover { color: rgba(180,195,235,0.7); }
 
-.psa-loading { display: none; padding: 56px 36px; text-align: center; }
-.psa-loading.show { display: block; }
-.psa-ring {
-  width: 48px; height: 48px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.06); border-top-color: #1A6BFF;
-  animation: psaSpin 0.9s linear infinite; margin: 0 auto 28px;
+/* ── STATUS MESSAGES ── */
+.status-msg {
+  font-family: var(--sans); font-size: 13px; margin-top: 10px;
+  min-height: 20px; line-height: 1.5;
+}
+.status-msg.error { color: #ff8a80; }
+.status-msg.success { color: #4de8a4; display: flex; align-items: center; gap: 6px; }
+.status-msg.info { color: var(--text-muted); }
+
+/* ── LOADING SCREEN ── */
+.loading-screen {
+  text-align: center;
+}
+.loading-ring {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.06); border-top-color: var(--blue);
+  animation: spin 0.9s linear infinite; margin: 0 auto 32px;
   box-shadow: 0 0 20px rgba(26,107,255,0.2);
 }
-@keyframes psaSpin { to { transform: rotate(360deg); } }
-.psa-steps { display: flex; flex-direction: column; gap: 6px; max-width: 280px; margin: 0 auto; }
-.psa-step {
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-label {
+  font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -0.04em; font-size: 24px; color: var(--text-primary); margin-bottom: 8px;
+}
+.loading-sub { font-size: 14px; color: var(--text-muted); }
+.loading-steps { margin-top: 28px; display: flex; flex-direction: column; gap: 6px; max-width: 280px; margin-left: auto; margin-right: auto; }
+.loading-step {
   display: flex; align-items: center; gap: 10px;
-  font-family: 'Inter', sans-serif; font-size: 13px;
-  color: rgba(200,210,240,0.28); padding: 9px 14px; border-radius: 8px; transition: all 0.3s;
+  font-size: 13px; color: rgba(180,195,235,0.3);
+  padding: 8px 12px; border-radius: 8px; transition: all 0.3s;
 }
-.psa-step.active { color: rgba(240,244,255,0.85); background: rgba(26,107,255,0.08); border: 1px solid rgba(26,107,255,0.15); font-weight: 500; }
-.psa-step.done   { color: #4de8a4; }
-.psa-step-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.08); flex-shrink: 0; transition: background 0.3s; }
-.psa-step.active .psa-step-dot { background: #1A6BFF; box-shadow: 0 0 8px rgba(26,107,255,0.6); animation: psaBlink 1s ease infinite; }
-.psa-step.done   .psa-step-dot { background: #4de8a4; }
-@keyframes psaBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.loading-step.active { color: var(--white); background: rgba(26,107,255,0.08); font-weight: 500; }
+.loading-step.done { color: #4de8a4; }
+.step-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.1); flex-shrink: 0; transition: all 0.3s; }
+.loading-step.active .step-dot { background: var(--blue); box-shadow: 0 0 8px rgba(26,107,255,0.6); animation: blink 1s ease infinite; }
+.loading-step.done .step-dot { background: #4de8a4; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-.psa-report { display: none; }
-.psa-report.show { display: block; }
-
-.psa-report-header {
-  background: linear-gradient(160deg,rgba(10,16,35,0.98) 0%,rgba(4,8,20,0.99) 100%);
-  border-bottom: 1px solid rgba(255,255,255,0.07); padding: 32px 36px 28px;
-  position: relative; overflow: hidden;
-}
-.psa-report-header::after {
-  content: ''; position: absolute; top: -80px; right: -80px;
-  width: 220px; height: 220px; border-radius: 50%;
-  background: radial-gradient(circle,rgba(26,107,255,0.12) 0%,transparent 70%);
-  pointer-events: none;
-}
-.psa-report-eyebrow {
-  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600;
-  letter-spacing: 0.18em; text-transform: uppercase; color: rgba(200,210,240,0.28); margin-bottom: 8px;
-}
-.psa-report-title {
-  font-family: 'Manrope', sans-serif; font-size: 22px; line-height: 1.1;
-  color: white; margin-bottom: 4px; font-weight: 800; letter-spacing: -0.03em;
-}
-.psa-report-meta { font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.28); }
-.psa-stats {
-  display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; margin-top: 20px;
-  background: rgba(255,255,255,0.06); border-radius: 10px; overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.06);
-}
-.psa-stat { padding: 14px 12px; background: rgba(26,107,255,0.04); text-align: center; }
-.psa-stat-val { font-family: 'Manrope', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: -0.03em; color: white; display: block; margin-bottom: 3px; }
-.psa-stat-val.good { color: #4de8a4; }
-.psa-stat-lbl { font-family: 'Inter', sans-serif; font-size: 10px; color: rgba(200,210,240,0.28); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; }
-
-.psa-report-body { padding: 0 36px 36px; }
-.psa-section { padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.psa-section:last-child { border-bottom: none; }
-.psa-section-label {
-  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700;
-  letter-spacing: 0.18em; text-transform: uppercase; color: rgba(200,210,240,0.28); margin-bottom: 10px;
-}
-.psa-section-h {
-  font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 700;
-  color: white; margin-bottom: 8px; line-height: 1.2; letter-spacing: -0.02em;
-}
-.psa-section-text {
-  font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.75;
-  color: rgba(200,210,240,0.55); white-space: pre-line;
-}
-
-.psa-table { width: 100%; border-collapse: collapse; }
-.psa-table td {
-  font-family: 'Inter', sans-serif; padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px;
-}
-.psa-table tr:last-child td { border-bottom: none; }
-.psa-table td:first-child { color: rgba(200,210,240,0.38); }
-.psa-table td:last-child { text-align: right; font-weight: 600; color: rgba(240,244,255,0.85); }
-
-.psa-alert {
-  border-radius: 8px; padding: 13px 16px; margin-bottom: 8px;
-  display: flex; align-items: flex-start; gap: 10px;
-  font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.6;
-}
-.psa-alert.warn { background: rgba(200,150,12,0.08); border-left: 2px solid #c8960c; color: rgba(200,210,240,0.65); }
-.psa-alert.good { background: rgba(10,122,82,0.08); border-left: 2px solid #0a7a52; color: rgba(200,210,240,0.65); }
-.psa-alert.info { background: rgba(26,107,255,0.08); border-left: 2px solid #1A6BFF; color: rgba(200,210,240,0.65); }
-.psa-alert svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; stroke: currentColor; stroke-width: 2; fill: none; }
-.psa-alert.warn svg { color: #c8960c; }
-.psa-alert.good svg { color: #4de8a4; }
-.psa-alert.info svg { color: #3A8AFF; }
-.psa-alert strong { font-weight: 600; display: block; margin-bottom: 3px; color: rgba(240,244,255,0.85); }
-
-.psa-rec {
-  background: linear-gradient(160deg,rgba(10,16,35,0.95) 0%,rgba(4,8,18,0.98) 100%);
-  border: 1px solid rgba(26,107,255,0.2); border-radius: 12px; padding: 22px; margin-top: 4px;
-  position: relative; overflow: hidden;
-}
-.psa-rec::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg,transparent,#1A6BFF 40%,#3A8AFF 60%,transparent); opacity: 0.6;
-}
-.psa-rec-label { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #3A8AFF; margin-bottom: 8px; }
-.psa-rec-h { font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 700; color: white; margin-bottom: 10px; line-height: 1.25; letter-spacing: -0.02em; }
-.psa-rec-steps { margin-top: 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
-.psa-rec-steps li { font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(200,210,240,0.48); line-height: 1.65; }
-
-.psa-actions { display: flex; gap: 10px; padding: 0 36px 36px; flex-wrap: wrap; }
-.psa-btn-dl {
-  display: flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,0.04); color: rgba(200,210,240,0.65);
-  border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 20px;
-  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.25s;
-}
-.psa-btn-dl:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); color: white; }
-.psa-btn-dl svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; }
-.psa-btn-restart {
-  background: none; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 20px;
-  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
-  color: rgba(200,210,240,0.32); cursor: pointer; transition: all 0.25s;
-}
-.psa-btn-restart:hover { border-color: rgba(255,255,255,0.15); color: rgba(200,210,240,0.6); }
-
-/* Program description */
-.psa-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 16px; }
-.psa-divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
-.psa-divider-label { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(200,210,240,0.22); white-space: nowrap; }
-.psa-program-wrap { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 18px; margin-bottom: 4px; }
-.psa-program-label { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: rgba(240,244,255,0.65); margin-bottom: 6px; display: block; }
-.psa-program-hint { font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.28); line-height: 1.6; margin-bottom: 14px; }
-.psa-program-fields { display: flex; flex-direction: column; gap: 10px; }
-.psa-program-field { display: flex; flex-direction: column; gap: 4px; }
-.psa-program-field label { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(200,210,240,0.28); }
-.psa-program-field input, .psa-program-field textarea {
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px; padding: 10px 14px; font-family: 'Inter', sans-serif; font-size: 13px;
-  color: rgba(240,244,255,0.8); outline: none; resize: none; transition: all 0.25s;
-}
-.psa-program-field input:focus, .psa-program-field textarea:focus { border-color: rgba(26,107,255,0.4); background: rgba(26,107,255,0.04); box-shadow: 0 0 20px rgba(26,107,255,0.06); }
-.psa-program-field input::placeholder, .psa-program-field textarea::placeholder { color: rgba(200,210,240,0.18); }
-.psa-optional-tag { font-size: 10px; color: rgba(200,210,240,0.2); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 4px; }
-
-/* Stack grid */
-.psa-stack-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
-.psa-stack-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 12px 14px; }
-.psa-stack-item-label { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(200,210,240,0.25); margin-bottom: 5px; display: block; }
-.psa-stack-item-val { font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(200,210,240,0.65); line-height: 1.45; }
-
-/* Confirmation screen */
-.psa-confirm { display: none; }
-.psa-confirm.show { display: block; }
-.psa-confirm-inner { padding: 52px 36px; text-align: center; display: flex; flex-direction: column; align-items: center; }
-.psa-confirm-icon {
-  width: 64px; height: 64px; border-radius: 18px;
+/* ── CONFIRM SCREEN ── */
+.confirm-screen { text-align: center; }
+.confirm-icon {
+  width: 72px; height: 72px; border-radius: 20px; margin: 0 auto 28px;
   background: linear-gradient(135deg,rgba(26,107,255,0.15),rgba(26,107,255,0.04));
   border: 1px solid rgba(26,107,255,0.25);
-  display: flex; align-items: center; justify-content: center; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: center;
 }
-.psa-confirm-icon svg { width: 28px; height: 28px; stroke: #3A8AFF; stroke-width: 1.75; fill: none; }
-.psa-confirm-eyebrow { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #3A8AFF; margin-bottom: 14px; }
-.psa-confirm-title { font-family: 'Manrope', sans-serif; font-size: 28px; font-weight: 800; line-height: 1.1; color: white; margin-bottom: 12px; letter-spacing: -0.04em; }
-.psa-confirm-sub { font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.7; color: rgba(200,210,240,0.45); max-width: 360px; margin-bottom: 28px; }
-.psa-confirm-badge {
+.confirm-icon svg { width: 32px; height: 32px; stroke: var(--glow); stroke-width: 1.5; fill: none; }
+.confirm-title { font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -0.04em; font-size: clamp(28px,4vw,44px); color: var(--text-primary); margin-bottom: 12px; line-height: 1.08; }
+.confirm-sub { font-size: 15px; color: var(--text-muted); line-height: 1.7; max-width: 400px; margin: 0 auto 32px; font-weight: 300; }
+.confirm-detail {
+  display: inline-flex; flex-direction: column; gap: 0;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px 28px; margin-bottom: 32px; text-align: left; min-width: 280px;
+}
+.confirm-row { display: flex; justify-content: space-between; gap: 24px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+.confirm-row:last-child { border-bottom: none; }
+.confirm-row-key { color: var(--text-muted); }
+.confirm-row-val { color: var(--text-primary); font-weight: 500; }
+.confirm-thankyou {
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 300;
+  color: var(--text-muted); line-height: 1.7; margin-top: 20px; text-align: center;
+}
+
+.confirm-badge {
   display: inline-flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 100px; padding: 8px 18px; margin-bottom: 28px;
-  font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.38); letter-spacing: 0.02em;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 100px; padding: 8px 18px; font-size: 12px; color: var(--muted);
 }
-.psa-confirm-badge span { color: #3A8AFF; font-weight: 600; }
-.psa-confirm-detail { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 16px 20px; width: 100%; margin-bottom: 24px; text-align: left; }
-.psa-confirm-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-family: 'Inter', sans-serif; font-size: 13px; }
-.psa-confirm-detail-row:last-child { border-bottom: none; }
-.psa-confirm-detail-key { color: rgba(200,210,240,0.32); }
-.psa-confirm-detail-val { color: rgba(240,244,255,0.8); font-weight: 500; }
-.psa-confirm-close {
-  font-family: 'Inter', sans-serif; background: none;
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-  padding: 12px 32px; font-size: 14px; font-weight: 500;
-  color: rgba(200,210,240,0.38); cursor: pointer; transition: all 0.25s;
+.confirm-badge span { color: var(--blue-glow); font-weight: 600; }
+
+/* ── BACK BUTTON ── */
+.back-btn {
+  position: fixed; bottom: 36px; left: 40px; z-index: 100;
+  background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+  padding: 9px 18px; font-family: var(--sans); font-size: 13px;
+  color: var(--text-muted); cursor: pointer; transition: all 0.25s;
+  display: flex; align-items: center; gap: 6px;
 }
-.psa-confirm-close:hover { border-color: rgba(255,255,255,0.2); color: rgba(200,210,240,0.65); }
+.back-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text-primary); }
+.back-btn svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+/* ── KEYBOARD HINT ── */
+.key-hint {
+  position: fixed; bottom: 36px; right: 40px; z-index: 100;
+  font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.2);
+  display: flex; align-items: center; gap: 6px;
+}
+.key { display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 7px; font-size: 11px; }
 
 @media (max-width: 600px) {
-  .psa-inner { padding: 28px 20px 32px; }
-  .psa-report-header { padding: 24px 20px 20px; }
-  .psa-report-body { padding: 0 20px 28px; }
-  .psa-actions { padding: 0 20px 28px; }
-  .psa-title { font-size: 24px; }
-  .psa-stack-grid { grid-template-columns: 1fr; }
+  .chrome { padding: 20px 24px; }
+  .stage { padding: 72px 24px 72px; }
+  .back-btn { left: 24px; bottom: 28px; }
+  .key-hint { right: 24px; bottom: 28px; }
+  .choice-grid.cols-2 { grid-template-columns: 1fr; }
+  .otp-digit { width: 44px; height: 56px; font-size: 24px; }
+  .upload-zone { padding: 40px 20px; }
 }
-
-/* ── PROGRESS BAR ── */
-.psa-progress-wrap { padding: 24px 36px 0; }
-.psa-progress-steps { display: flex; align-items: center; }
-.psa-progress-step { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
-.psa-progress-dot {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700;
-  color: rgba(255,255,255,0.25); transition: all 0.3s;
-}
-.psa-progress-step.active .psa-progress-dot { background: rgba(26,107,255,0.2); border-color: #1A6BFF; color: #3A8AFF; box-shadow: 0 0 12px rgba(26,107,255,0.3); }
-.psa-progress-step.done .psa-progress-dot { background: rgba(10,122,82,0.2); border-color: #0a7a52; color: #4de8a4; }
-.psa-progress-label { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(200,210,240,0.25); transition: color 0.3s; white-space: nowrap; }
-.psa-progress-step.active .psa-progress-label { color: #3A8AFF; }
-.psa-progress-step.done .psa-progress-label { color: rgba(200,210,240,0.5); }
-.psa-progress-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); margin: 0 8px; margin-bottom: 20px; transition: background 0.3s; }
-.psa-progress-line.done { background: rgba(10,122,82,0.4); }
-
-/* ── STEP PANELS ── */
-.psa-step-panel { }
-
-/* ── RECOMMEND BOX ── */
-.psa-recommend-box {
-  display: flex; align-items: flex-start; gap: 12px;
-  background: rgba(26,107,255,0.06); border: 1px solid rgba(26,107,255,0.15);
-  border-radius: 10px; padding: 14px 16px; margin-bottom: 20px;
-}
-.psa-recommend-icon { flex-shrink: 0; width: 20px; height: 20px; margin-top: 1px; stroke: #3A8AFF; }
-.psa-recommend-icon svg { width: 18px; height: 18px; stroke: #3A8AFF; stroke-width: 1.75; fill: none; }
-.psa-recommend-title { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700; color: #3A8AFF; margin-bottom: 3px; letter-spacing: 0.02em; }
-.psa-recommend-text { font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.5); line-height: 1.6; }
-
-/* ── FILE LIST ── */
-.psa-files-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.psa-file-item {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(10,122,82,0.08); border: 1px solid rgba(10,122,82,0.2);
-  border-radius: 8px; padding: 10px 14px;
-}
-.psa-file-icon { flex-shrink: 0; }
-.psa-file-icon svg { width: 16px; height: 16px; stroke: #4de8a4; stroke-width: 2; fill: none; }
-.psa-file-name { font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(240,244,255,0.8); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.psa-file-size { font-family: 'Inter', sans-serif; font-size: 11px; color: rgba(200,210,240,0.35); flex-shrink: 0; }
-.psa-file-remove { background: none; border: none; cursor: pointer; color: rgba(200,210,240,0.3); padding: 2px; transition: color 0.15s; flex-shrink: 0; }
-.psa-file-remove:hover { color: #ff8a80; }
-.psa-file-remove svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; }
-
-/* ── STEP NAV ── */
-.psa-step-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; gap: 10px; }
-.psa-skip-note { font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.3); }
-.psa-skip-link { background: none; border: none; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.45); text-decoration: underline; text-underline-offset: 2px; padding: 0; transition: color 0.15s; }
-.psa-skip-link:hover { color: rgba(200,210,240,0.7); }
-.psa-btn-back {
-  background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-  padding: 11px 18px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
-  color: rgba(200,210,240,0.38); cursor: pointer; transition: all 0.25s;
-}
-.psa-btn-back:hover { border-color: rgba(255,255,255,0.2); color: rgba(200,210,240,0.65); }
-
-/* ── FORM FIELDS ── */
-.psa-field-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-.psa-field { display: flex; flex-direction: column; gap: 5px; }
-.psa-field-label { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(200,210,240,0.4); }
-.psa-field-why { font-size: 10px; font-weight: 400; text-transform: none; letter-spacing: 0; color: rgba(200,210,240,0.22); }
-.psa-field-input {
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 8px; padding: 11px 14px;
-  font-family: 'Inter', sans-serif; font-size: 14px; color: rgba(240,244,255,0.85);
-  outline: none; transition: all 0.25s;
-}
-.psa-field-input:focus { border-color: rgba(26,107,255,0.45); background: rgba(26,107,255,0.04); box-shadow: 0 0 16px rgba(26,107,255,0.08); }
-.psa-field-input::placeholder { color: rgba(200,210,240,0.2); }
-.psa-field-select {
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 8px; padding: 11px 36px 11px 14px;
-  font-family: 'Inter', sans-serif; font-size: 14px; color: rgba(240,244,255,0.85);
-  outline: none; appearance: none; cursor: pointer; transition: all 0.25s;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(200,210,240,0.3)' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 12px center;
-}
-.psa-field-select:focus { border-color: rgba(26,107,255,0.45); background-color: rgba(26,107,255,0.04); }
-.psa-field-select option { background: #0d1628; color: rgba(240,244,255,0.85); }
-.psa-field-textarea {
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 8px; padding: 11px 14px; width: 100%;
-  font-family: 'Inter', sans-serif; font-size: 14px; color: rgba(240,244,255,0.85);
-  outline: none; resize: vertical; transition: all 0.25s; line-height: 1.65;
-}
-.psa-field-textarea:focus { border-color: rgba(26,107,255,0.45); background: rgba(26,107,255,0.04); box-shadow: 0 0 16px rgba(26,107,255,0.08); }
-.psa-field-textarea::placeholder { color: rgba(200,210,240,0.2); }
-
-/* ── CHECKBOXES ── */
-.psa-checkbox-group { display: flex; flex-direction: column; gap: 6px; }
-.psa-checkbox {
-  display: flex; align-items: center; gap: 10px;
-  font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(200,210,240,0.65);
-  cursor: pointer; padding: 8px 12px; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.06); transition: all 0.15s;
-}
-.psa-checkbox:hover { background: rgba(26,107,255,0.05); border-color: rgba(26,107,255,0.15); }
-.psa-checkbox input[type="checkbox"] { accent-color: #1A6BFF; width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
-
-/* ── PRIVACY NOTE ── */
-.psa-privacy-note {
-  display: flex; align-items: flex-start; gap: 8px;
-  font-family: 'Inter', sans-serif; font-size: 11px; color: rgba(200,210,240,0.28);
-  line-height: 1.55; margin-top: 14px; margin-bottom: 4px;
-}
-.psa-privacy-note svg { flex-shrink: 0; margin-top: 1px; stroke: rgba(200,210,240,0.28); }
-
-@media (max-width: 480px) {
-  .psa-field-group { grid-template-columns: 1fr; }
-  .psa-progress-label { display: none; }
-}
-
-
-/* ── OTP ── */
-.otp-sent-note {
-  font-family: 'Inter', sans-serif; font-size: 13px;
-  color: rgba(200,210,240,0.55); line-height: 1.6;
-  margin-bottom: 12px; padding: 12px 14px;
-  background: rgba(26,107,255,0.06); border: 1px solid rgba(26,107,255,0.15);
-  border-radius: 8px;
-}
-.otp-input-row { display: flex; gap: 8px; }
-.otp-input {
-  flex: 1; font-size: 22px !important; font-weight: 700 !important;
-  letter-spacing: 0.25em; text-align: center;
-}
-.otp-resend-btn {
-  background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-  padding: 0 16px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
-  color: rgba(200,210,240,0.45); cursor: pointer; white-space: nowrap; transition: all 0.2s;
-  flex-shrink: 0;
-}
-.otp-resend-btn:hover { border-color: rgba(255,255,255,0.2); color: rgba(200,210,240,0.7); }
-.otp-error {
-  font-family: 'Inter', sans-serif; font-size: 12px; color: #ff8a80;
-  margin-top: 6px; min-height: 18px;
-}
-.otp-success {
-  display: flex; align-items: center; gap: 6px;
-  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
-  color: #4de8a4; margin-top: 6px;
-}
-.otp-success svg { stroke: #4de8a4; }
-
 </style>
 </head>
 <body>
 
-<div class="page-wrap">
-  <div class="page-eyebrow">Access AI-powered payments reviews</div>
-  <h1 class="page-h1">Look inside your<br><span class="grad">payments stack</span></h1>
-  <p class="page-sub">Consultants charge $50,000+ for a payments review. Get the same insights, powered by AI, for free.</p>
-  <button class="page-btn" onclick="openAnalyserModal()">
-    Get your free payments review
-    <span class="page-btn-arrow">→</span>
-  </button>
-  <p class="page-note">No sign-up required · Takes 2 minutes</p>
+<div class="ambient ambient-1"></div>
+<div class="ambient ambient-2"></div>
+
+<!-- Chrome -->
+<header class="chrome">
+  <div></div>
+  <div class="progress-track" id="progressTrack"></div>
+</header>
+
+<!-- Back button -->
+<button class="back-btn" id="backBtn" onclick="goBack()" style="display:none">
+  <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+  Back
+</button>
+
+<!-- Keyboard hint -->
+<div class="key-hint" id="keyHint">
+  Press <span class="key">Enter ↵</span> to continue
 </div>
 
-<!-- ── MODAL ── -->
-<div id="psa-backdrop" onclick="psaBackdropClick(event)">
-  <div id="psa-modal">
-    <button id="psa-close" onclick="closeAnalyserModal()">
-      <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
-    </button>
+<!-- Stage -->
+<div class="stage">
 
-    <!-- Upload panel -->
-        <!-- STEP PROGRESS BAR -->
-    <div class="psa-progress-wrap">
-      <div class="psa-progress-steps">
-        <div class="psa-progress-step active" id="prog-s1">
-          <div class="psa-progress-dot">1</div>
-          <div class="psa-progress-label">Upload</div>
-        </div>
-        <div class="psa-progress-line" id="prog-l1"></div>
-        <div class="psa-progress-step" id="prog-s2">
-          <div class="psa-progress-dot">2</div>
-          <div class="psa-progress-label">Contact</div>
-        </div>
-        <div class="psa-progress-line" id="prog-l2"></div>
-        <div class="psa-progress-step" id="prog-s3">
-          <div class="psa-progress-dot">3</div>
-          <div class="psa-progress-label">Your business</div>
-        </div>
+  <!-- S0: Upload -->
+  <div class="screen active" id="s0">
+    <div class="q-text">Upload your<br>merchant statements.</div>
+    <div class="q-sub">Last 3 months gives the clearest picture. You can also include monthly reports exported from your payment dashboard — Stripe, Square, Shopify Payments etc.</div>
+    <div class="file-chips" id="fileChips"></div>
+    <div class="upload-zone" id="uploadZone"
+         onclick="document.getElementById('fileInput').click()"
+         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       </div>
+      <div class="upload-title">Drop files here</div>
+      <div class="upload-sub">PDF statements, images, or dashboard exports<br>Up to 10 files accepted</div>
+      <div class="upload-formats">PDF · PNG · JPG · HEIC · XLSX · CSV</div>
     </div>
-
-    <!-- ── STEP 1: UPLOAD ── -->
-    <div id="psa-step-1" class="psa-step-panel">
-      <div class="psa-inner">
-        <div class="psa-eyebrow">Step 1 of 3</div>
-        <div class="psa-title">Upload your<br><em>statements.</em></div>
-        <div class="psa-sub">Upload your merchant statements and any monthly reports from your payment dashboard. The more data you share, the more precise your analysis will be.</div>
-
-        <div class="psa-recommend-box">
-          <div class="psa-recommend-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
-          </div>
-          <div>
-            <div class="psa-recommend-title">What to upload</div>
-            <div class="psa-recommend-text">We recommend your last 3 months of merchant statements — a single month can be misleading due to seasonal variation. You can also include monthly reports exported from your payment dashboard (Stripe, Square, Shopify Payments etc.) which give us richer data on payment types, card mix, and dispute rates. Up to 10 files accepted.</div>
-          </div>
-        </div>
-
-        <div class="psa-files-list" id="psaFilesList"></div>
-
-        <div class="psa-drop" id="psa-drop"
-             onclick="document.getElementById('psa-file-input').click()"
-             ondragover="psaDragOver(event)" ondragleave="psaDragLeave(event)" ondrop="psaDrop(event)">
-          <div class="psa-drop-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          </div>
-          <div class="psa-drop-title" id="psa-drop-label">Drop statements here</div>
-          <div class="psa-drop-sub">or tap to browse files</div>
-          <div class="psa-drop-formats">PDF · PNG · JPG · HEIC — up to 10 files</div>
-        </div>
-        <input type="file" id="psa-file-input" accept=".pdf,image/*" multiple onchange="psaFileSelect(event)">
-
-        <div class="psa-step-nav">
-          <div class="psa-skip-note">Don't have statements handy?
-            <button class="psa-skip-link" onclick="psaSkipUpload()">Continue without them →</button>
-          </div>
-          <button class="psa-btn" id="psa-btn-step1" onclick="psaGoStep(2)" disabled>
-            Continue
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-          </button>
-        </div>
-        <div class="psa-error" id="psa-error"></div>
-      </div>
+    <input type="file" id="fileInput" accept=".pdf,image/*,.xlsx,.csv" multiple onchange="onFileSelect(event)">
+    <div class="cta-row">
+      <button class="cta" id="ctaS0" onclick="advance()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+      <button class="skip-link" onclick="skipUpload()">I don't have statements handy</button>
     </div>
-
-    <!-- ── STEP 2: CONTACT GATE ── -->
-    <div id="psa-step-2" class="psa-step-panel" style="display:none">
-      <div class="psa-inner">
-        <div class="psa-eyebrow">Step 2 of 3</div>
-        <div class="psa-title">Where should we<br><em>send your report?</em></div>
-        <div class="psa-sub">Enter your details so we know where to send your completed report. A payments expert will review your analysis before it's shared with you.</div>
-
-        <div class="psa-field-group">
-          <div class="psa-field">
-            <label class="psa-field-label">First name</label>
-            <input class="psa-field-input" type="text" id="gate-firstname" placeholder="Jane" oninput="psaValidateGate()">
-          </div>
-          <div class="psa-field">
-            <label class="psa-field-label">Last name</label>
-            <input class="psa-field-input" type="text" id="gate-lastname" placeholder="Smith" oninput="psaValidateGate()">
-          </div>
-        </div>
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">Email address</label>
-          <input class="psa-field-input" type="email" id="gate-email" placeholder="jane@business.com.au" oninput="psaValidateGate()">
-        </div>
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">Mobile number</label>
-          <input class="psa-field-input" type="tel" id="gate-phone" placeholder="04XX XXX XXX" oninput="psaValidateGate()">
-        </div>
-
-        <div class="psa-privacy-note">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Your details are never shared or sold. We use them only to deliver your report.
-        </div>
-
-        <!-- OTP verification panel -->
-        <div id="otp-panel" style="display:none">
-          <div class="otp-sent-note" id="otp-sent-note"></div>
-          <div class="psa-field" style="margin-bottom:6px">
-            <label class="psa-field-label">Enter the 6-digit code sent to your email</label>
-            <div class="otp-input-row">
-              <input class="psa-field-input otp-input" type="text" id="otp-input"
-                placeholder="000000" maxlength="6" inputmode="numeric"
-                oninput="psaOtpInput(this)">
-              <button class="otp-resend-btn" id="otp-resend-btn" onclick="psaSendOtp(true)">Resend</button>
-            </div>
-          </div>
-          <div class="otp-error" id="otp-error"></div>
-          <div class="otp-success" id="otp-success" style="display:none">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Email verified
-          </div>
-        </div>
-
-        <div class="psa-step-nav">
-          <button class="psa-btn-back" id="gate-back-btn" onclick="psaGoStep(1)">← Back</button>
-          <button class="psa-btn" id="psa-btn-step2" onclick="psaGateNext()" disabled>
-            Send verification code
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── STEP 3: BUSINESS PROFILE ── -->
-    <div id="psa-step-3" class="psa-step-panel" style="display:none">
-      <div class="psa-inner">
-        <div class="psa-eyebrow">Step 3 of 3</div>
-        <div class="psa-title">Tell us about<br><em>your business.</em></div>
-        <div class="psa-sub">The more context you give us, the more specific and valuable your review will be. All fields are optional.</div>
-
-        <!-- Industry -->
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">Industry <span class="psa-field-why">Helps us identify industry-specific rates and providers</span></label>
-          <select class="psa-field-select" id="prof-industry" onchange="psaIndustryChange()">
-            <option value="">Select your industry...</option>
-            <option value="retail">Retail — general merchandise</option>
-            <option value="food">Food &amp; beverage / hospitality</option>
-            <option value="ecommerce">eCommerce — online only</option>
-            <option value="retail_ecom">Retail + eCommerce</option>
-            <option value="health">Healthcare / medical / dental</option>
-            <option value="professional">Professional services (legal, accounting, consulting)</option>
-            <option value="trades">Trades &amp; construction</option>
-            <option value="accommodation">Accommodation / hotels</option>
-            <option value="transport">Transport / logistics</option>
-            <option value="education">Education</option>
-            <option value="nonprofit">Not-for-profit</option>
-            <option value="wholesale">Wholesale / B2B</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
-        <!-- Annual revenue -->
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">Annual revenue <span class="psa-field-why">Determines which pricing models are available to you</span></label>
-          <select class="psa-field-select" id="prof-revenue">
-            <option value="">Select range...</option>
-            <option value="under1m">Under $1 million</option>
-            <option value="1to5m">$1M – $5M</option>
-            <option value="5to20m">$5M – $20M</option>
-            <option value="20to50m">$20M – $50M</option>
-            <option value="50mplus">$50M+</option>
-          </select>
-        </div>
-
-        <!-- Locations -->
-        <div class="psa-field-group">
-          <div class="psa-field">
-            <label class="psa-field-label">Number of locations</label>
-            <input class="psa-field-input" type="number" id="prof-locations" placeholder="e.g. 3" min="1">
-          </div>
-          <div class="psa-field">
-            <label class="psa-field-label">Number of terminals</label>
-            <input class="psa-field-input" type="number" id="prof-terminals" placeholder="e.g. 8" min="0">
-          </div>
-        </div>
-
-        <!-- Payment channels -->
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">How do you take payments? <span class="psa-field-why">Select all that apply</span></label>
-          <div class="psa-checkbox-group">
-            <label class="psa-checkbox"><input type="checkbox" value="instore" class="psa-ch-channel"> In-store (card present)</label>
-            <label class="psa-checkbox"><input type="checkbox" value="online" class="psa-ch-channel"> Online / eCommerce</label>
-            <label class="psa-checkbox"><input type="checkbox" value="phone" class="psa-ch-channel"> Phone / MOTO</label>
-            <label class="psa-checkbox"><input type="checkbox" value="invoice" class="psa-ch-channel"> Invoices / payment links</label>
-            <label class="psa-checkbox"><input type="checkbox" value="recurring" class="psa-ch-channel"> Recurring / subscriptions</label>
-          </div>
-        </div>
-
-        <!-- eCommerce platform (shown/hidden based on channels) -->
-        <div class="psa-field" id="prof-ecom-wrap" style="margin-bottom:10px;display:none">
-          <label class="psa-field-label">eCommerce platform <span class="psa-field-why">Affects which payment gateways are compatible</span></label>
-          <select class="psa-field-select" id="prof-ecom">
-            <option value="">Select platform...</option>
-            <option value="shopify">Shopify</option>
-            <option value="woocommerce">WooCommerce</option>
-            <option value="magento">Magento / Adobe Commerce</option>
-            <option value="bigcommerce">BigCommerce</option>
-            <option value="custom">Custom built</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
-        <!-- POS system — only shown if in-store channel selected -->
-        <div class="psa-field" id="prof-pos-wrap" style="margin-bottom:10px;display:none">
-          <label class="psa-field-label">POS system <span class="psa-field-why">Some POS systems restrict which terminals you can use</span></label>
-          <select class="psa-field-select" id="prof-pos">
-            <option value="">Select POS...</option>
-            <option value="lightspeed">Lightspeed</option>
-            <option value="square">Square POS</option>
-            <option value="kounta">Kounta / Lightspeed Restaurant</option>
-            <option value="vend">Vend</option>
-            <option value="mywinery">My Winery / Winetrust</option>
-            <option value="revel">Revel</option>
-            <option value="clover">Clover</option>
-            <option value="custom">Custom / proprietary</option>
-            <option value="none">No POS system</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
-        <!-- Contract situation -->
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">Current contract situation</label>
-          <select class="psa-field-select" id="prof-contract">
-            <option value="">Select...</option>
-            <option value="month">Month-to-month — can switch anytime</option>
-            <option value="expiring">Under contract, expiring in the next 6 months</option>
-            <option value="locked">Locked in for 12+ months</option>
-            <option value="unsure">Not sure</option>
-            <option value="none">No current provider</option>
-          </select>
-        </div>
-
-        <!-- International -->
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">Approximate % of sales that are international</label>
-          <select class="psa-field-select" id="prof-international">
-            <option value="">Select...</option>
-            <option value="none">None — domestic only</option>
-            <option value="under10">Under 10%</option>
-            <option value="10to30">10% – 30%</option>
-            <option value="over30">Over 30%</option>
-          </select>
-        </div>
-
-        <!-- Fraud tools -->
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">Fraud &amp; risk tools currently in use</label>
-          <div class="psa-checkbox-group">
-            <label class="psa-checkbox"><input type="checkbox" value="stripe_radar" class="psa-ch-fraud"> Stripe Radar</label>
-            <label class="psa-checkbox"><input type="checkbox" value="signifyd" class="psa-ch-fraud"> Signifyd</label>
-            <label class="psa-checkbox"><input type="checkbox" value="kount" class="psa-ch-fraud"> Kount</label>
-            <label class="psa-checkbox"><input type="checkbox" value="3ds" class="psa-ch-fraud"> 3D Secure</label>
-            <label class="psa-checkbox"><input type="checkbox" value="none" class="psa-ch-fraud"> None</label>
-            <label class="psa-checkbox"><input type="checkbox" value="other" class="psa-ch-fraud"> Other</label>
-          </div>
-        </div>
-
-        <!-- Pain points -->
-        <div class="psa-field" style="margin-bottom:10px">
-          <label class="psa-field-label">What's your biggest frustration with your current payment setup? <span class="psa-field-why">This shapes what we prioritise in your review</span></label>
-          <textarea class="psa-field-textarea" id="prof-painpoints" rows="3"
-            placeholder="e.g. Fees feel too high but I don't know why. My provider's support is terrible. I'm getting chargebacks I can't explain. I want to expand online but my current setup won't support it..."></textarea>
-        </div>
-
-        <!-- Anything else -->
-        <div class="psa-field" style="margin-bottom:4px">
-          <label class="psa-field-label">Anything else we should know?</label>
-          <textarea class="psa-field-textarea" id="prof-other" rows="2"
-            placeholder="e.g. We're expanding to New Zealand next year. We have a very high average transaction value. We process a lot of Amex..."></textarea>
-        </div>
-
-        <div class="psa-step-nav" style="margin-top:20px">
-          <button class="psa-btn-back" onclick="psaGoStep(2)">← Back</button>
-          <button class="psa-btn" onclick="psaSubmitAll()">
-            Submit for review
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── LOADING ── -->
-    <div id="psa-loading-panel" class="psa-loading">
-      <div class="psa-ring"></div>
-      <div class="psa-steps">
-        <div class="psa-step active" id="psa-s1"><div class="psa-step-dot"></div>Reading your statements</div>
-        <div class="psa-step" id="psa-s2"><div class="psa-step-dot"></div>Extracting fee structure</div>
-        <div class="psa-step" id="psa-s3"><div class="psa-step-dot"></div>Benchmarking against market rates</div>
-        <div class="psa-step" id="psa-s4"><div class="psa-step-dot"></div>Writing your report</div>
-      </div>
-    </div>
-
-    <!-- ── CONFIRMATION ── -->
-    <div id="psa-confirm-panel" class="psa-confirm">
-      <div class="psa-confirm-inner">
-        <div class="psa-confirm-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        </div>
-        <div class="psa-confirm-eyebrow">Submission received</div>
-        <div class="psa-confirm-title">Your review is in<br>expert hands.</div>
-        <div class="psa-confirm-sub">As Payswitch is currently in beta, your AI-generated report will be reviewed by a payments expert before being shared with you.</div>
-        <div class="psa-confirm-badge">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          You'll receive your report within <span>&nbsp;24 hours</span>
-        </div>
-        <div class="psa-confirm-detail" id="psa-confirm-details"></div>
-        <button class="psa-confirm-close" onclick="closeAnalyserModal(); psaReset();">Close</button>
-      </div>
-    </div>
-
   </div>
+
+  <!-- S1: Name -->
+  <div class="screen" id="s1">
+    <div class="q-text">What's your name?</div>
+    <div class="q-input-wrap">
+      <input class="q-input" type="text" id="inp-firstname" placeholder="Jane Smith" autocomplete="name" oninput="validateS1()">
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS1" onclick="advance()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- S2: Email -->
+  <div class="screen" id="s2">
+    <div class="q-text">And your<br>email address?</div>
+    <div class="q-sub">This is where we'll send your completed report.</div>
+    <div class="q-input-wrap">
+      <input class="q-input" type="email" id="inp-email" placeholder="you@company.com" autocomplete="email" oninput="validateS2()">
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS2" onclick="sendOtp()" disabled>
+        Send verification code
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+      <button class="skip-link" onclick="skipEmail()">Skip for now</button>
+    </div>
+    <div class="status-msg" id="statusS2"></div>
+  </div>
+
+  <!-- S3: OTP -->
+  <div class="screen" id="s3">
+    <div class="q-text">Check your<br>inbox.</div>
+    <div class="q-sub" id="otpSub">We sent a 6-digit code to your email.</div>
+    <div class="otp-digits" id="otpDigits">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="0" onkeydown="otpKey(event,0)" oninput="otpInput(event,0)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="1" onkeydown="otpKey(event,1)" oninput="otpInput(event,1)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="2" onkeydown="otpKey(event,2)" oninput="otpInput(event,2)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="3" onkeydown="otpKey(event,3)" oninput="otpInput(event,3)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="4" onkeydown="otpKey(event,4)" oninput="otpInput(event,4)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="5" onkeydown="otpKey(event,5)" oninput="otpInput(event,5)">
+    </div>
+    <div class="status-msg" id="statusS3"></div>
+    <div class="cta-row" style="margin-top:24px">
+      <button class="cta" id="ctaS3" onclick="verifyOtp()" disabled>
+        Verify code
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+      <button class="skip-link" onclick="sendOtp(true)">Resend code</button>
+    </div>
+  </div>
+
+  <!-- S4: Mobile -->
+  <div class="screen" id="s4">
+    <div class="q-text">What's your<br>mobile number?</div>
+    <div class="q-input-wrap">
+      <input class="q-input" type="tel" id="inp-phone" placeholder="04XX XXX XXX" autocomplete="tel" oninput="validateS4()">
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS4" onclick="advance()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- S5: Industry -->
+  <div class="screen" id="s5">
+    <div class="q-text">What kind of<br>business are you?</div>
+    <div class="choice-grid cols-2" id="industryGrid">
+      <div class="choice" onclick="selectChoice(this,'industry','retail')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div><div class="choice-text"><div class="choice-label">Retail</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'industry','food')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></div><div class="choice-text"><div class="choice-label">Food & Hospitality</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'industry','ecommerce')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div class="choice-text"><div class="choice-label">eCommerce</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'industry','health')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="choice-text"><div class="choice-label">Healthcare</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'industry','professional')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div class="choice-text"><div class="choice-label">Professional Services</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'industry','trades')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div><div class="choice-text"><div class="choice-label">Trades & Construction</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'industry','accommodation')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="choice-text"><div class="choice-label">Accommodation</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'industry','other')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="choice-text"><div class="choice-label">Other</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS5" onclick="advance()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- S6: Channels -->
+  <div class="screen" id="s6">
+    <div class="q-text">How do you<br>take payments?</div>
+    <div class="q-sub">Select all that apply.</div>
+    <div class="choice-grid cols-1" id="channelGrid">
+      <div class="choice multi" onclick="toggleChoice(this,'channels','instore')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div><div class="choice-text"><div class="choice-label">In-store</div><div class="choice-sub">Card terminals, tap & pay</div></div><div class="choice-check"></div></div>
+      <div class="choice multi" onclick="toggleChoice(this,'channels','online')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><div class="choice-text"><div class="choice-label">Online</div><div class="choice-sub">Website, eCommerce</div></div><div class="choice-check"></div></div>
+      <div class="choice multi" onclick="toggleChoice(this,'channels','invoice')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div><div class="choice-text"><div class="choice-label">Invoices & payment links</div><div class="choice-sub">Send to customers to pay</div></div><div class="choice-check"></div></div>
+      <div class="choice multi" onclick="toggleChoice(this,'channels','recurring')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div><div class="choice-text"><div class="choice-label">Recurring / subscriptions</div><div class="choice-sub">Automatic billing</div></div><div class="choice-check"></div></div>
+      <div class="choice multi" onclick="toggleChoice(this,'channels','phone')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="choice-text"><div class="choice-label">Phone / MOTO</div><div class="choice-sub">Card not present, over the phone</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="cta-row" style="margin-top:8px">
+      <button class="cta" id="ctaS6" onclick="advanceFromChannels()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- S6b: eCommerce platform (conditional — online only) -->
+  <div class="screen" id="s6b">
+    <div class="q-text">Which eCommerce<br>platform do you use?</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" onclick="selectChoice(this,'ecomPlatform','shopify')"><div class="choice-text"><div class="choice-label">Shopify</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'ecomPlatform','woocommerce')"><div class="choice-text"><div class="choice-label">WooCommerce</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'ecomPlatform','magento')"><div class="choice-text"><div class="choice-label">Magento / Adobe Commerce</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'ecomPlatform','bigcommerce')"><div class="choice-text"><div class="choice-label">BigCommerce</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'ecomPlatform','custom')"><div class="choice-text"><div class="choice-label">Custom built</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'ecomPlatform','other')"><div class="choice-text"><div class="choice-label">Other</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS6b" onclick="advanceFromEcom()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- S6c: Terminal setup (conditional — in-store only) -->
+  <div class="screen" id="s6c">
+    <div class="q-text">How are your<br>terminals set up?</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" onclick="selectChoice(this,'terminalSetup','standalone');advanceFromTerminal()"><div class="choice-text"><div class="choice-label">Standalone</div><div class="choice-sub">Terminals operate independently, not connected to a POS</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'terminalSetup','integrated');document.getElementById('ctaS6c').disabled=false"><div class="choice-text"><div class="choice-label">Integrated with a POS system</div><div class="choice-sub">Terminals connect directly to point-of-sale software</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="cta-row" style="margin-top:8px">
+      <button class="cta" id="ctaS6c" onclick="advanceFromTerminal()" disabled style="display:none">
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- S6d: POS system (conditional — integrated terminals only) -->
+  <div class="screen" id="s6d">
+    <div class="q-text">Which POS system<br>do you use?</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" onclick="selectChoice(this,'posSystem','lightspeed')"><div class="choice-text"><div class="choice-label">Lightspeed</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'posSystem','square')"><div class="choice-text"><div class="choice-label">Square POS</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'posSystem','kounta')"><div class="choice-text"><div class="choice-label">Kounta / Lightspeed Restaurant</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'posSystem','vend')"><div class="choice-text"><div class="choice-label">Vend</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'posSystem','clover')"><div class="choice-text"><div class="choice-label">Clover</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'posSystem','revel')"><div class="choice-text"><div class="choice-label">Revel</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'posSystem','custom')"><div class="choice-text"><div class="choice-label">Custom / proprietary</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'posSystem','other')"><div class="choice-text"><div class="choice-label">Other</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS6d" onclick="advance()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- S6e: LCR status -->
+  <div class="screen" id="s6e">
+    <div class="q-text">Is Least Cost Routing<br>turned on?</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" onclick="selectChoice(this,'lcrStatus','on');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Yes, it's on</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'lcrStatus','off');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">No, it's off</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'lcrStatus','unknown');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">I don't know</div></div><div class="choice-check"></div></div>
+    </div>
+  </div>
+
+  <!-- S6f: Pricing model -->
+  <div class="screen" id="s6f">
+    <div class="q-text">What pricing model<br>are you on?</div>
+    <div class="q-sub">Your statement will confirm this, but knowing upfront helps us frame the analysis correctly.</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" onclick="selectChoice(this,'pricingModel','blended');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Blended</div><div class="choice-sub">One flat rate for all card types</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'pricingModel','ic_plus');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Interchange Plus (IC+)</div><div class="choice-sub">Interchange cost plus a fixed processor margin</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'pricingModel','ic_plusplus');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Interchange++ (IC++)</div><div class="choice-sub">Every component itemised separately</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'pricingModel','unknown');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">I don't know</div></div><div class="choice-check"></div></div>
+    </div>
+  </div>
+
+  <!-- S7: Revenue -->
+  <div class="screen" id="s7">
+    <div class="q-text">What's your<br>annual revenue?</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" onclick="selectChoice(this,'revenue','under1m')"><div class="choice-text"><div class="choice-label">Under $1 million</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'revenue','1to5m')"><div class="choice-text"><div class="choice-label">$1M – $5M</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'revenue','5to20m')"><div class="choice-text"><div class="choice-label">$5M – $20M</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'revenue','20to50m')"><div class="choice-text"><div class="choice-label">$20M – $50M</div></div><div class="choice-check"></div></div>
+      <div class="choice" onclick="selectChoice(this,'revenue','50mplus')"><div class="choice-text"><div class="choice-label">$50M+</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS7" onclick="advance()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- S8: Pain points -->
+  <div class="screen" id="s8">
+    <div class="q-text">What's your biggest<br>frustration with your<br>current setup?</div>
+    <div class="q-sub">Or what made you start looking? Be as specific as you like — this shapes what we prioritise in your review.</div>
+    <div class="q-input-wrap">
+      <textarea class="q-input" id="inp-pain" placeholder="e.g. Fees feel too high but I can't figure out why. I'm getting chargebacks I can't explain..." rows="3" style="resize:none;font-size:18px;line-height:1.55;padding-top:8px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';validateS8()"></textarea>
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS8" onclick="submitAll()">
+        Submit for review
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+      <button class="skip-link" onclick="data.pain='';submitAll()">Skip this question</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="screen" id="sLoading">
+    <div class="loading-screen">
+      <div class="loading-ring"></div>
+      <div class="loading-label">Analysing your payments</div>
+      <div class="loading-sub">This takes about 30 seconds</div>
+      <div class="loading-steps">
+        <div class="loading-step active" id="ls0"><div class="step-dot"></div>Reading your statements</div>
+        <div class="loading-step" id="ls1"><div class="step-dot"></div>Extracting fee structure</div>
+        <div class="loading-step" id="ls2"><div class="step-dot"></div>Benchmarking against market rates</div>
+        <div class="loading-step" id="ls3"><div class="step-dot"></div>Writing your report</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm -->
+  <div class="screen" id="sConfirm">
+    <div class="confirm-screen">
+      <div class="confirm-icon">
+        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <div class="confirm-title">You're in<br>good hands.</div>
+      <div class="confirm-sub">Payswitch is currently in beta. A payments expert will review the AI-generated report before it is shared with you.</div>
+      <div class="confirm-detail" id="confirmDetail"></div>
+      <div class="confirm-thankyou">Thank you for your patience as we review your report.</div>
+
+    </div>
+  </div>
+
 </div>
 
 <script>
 const PSA_API_KEY = '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';
 
 // ── State ─────────────────────────────────────────────────────────
-let psaFiles = [];
-let psaCurrentStep = 1;
+const data = {
+  files: [], skippedUpload: false,
+  firstname: '', email: '', emailVerified: false,
+  phone: '', industry: '', channels: [], revenue: '',
+  ecomPlatform: '', terminalSetup: '', posSystem: '',
+  lcrStatus: '', pricingModel: '', pain: ''
+};
+let otp = { code: null, sent: false };
 
-// ── Modal open/close ──────────────────────────────────────────────
-function openAnalyserModal() {
-  const bd = document.getElementById('psa-backdrop');
-  bd.classList.add('open');
-  document.body.style.overflow = 'hidden';
-  requestAnimationFrame(() => bd.classList.add('visible'));
-}
-function closeAnalyserModal() {
-  const bd = document.getElementById('psa-backdrop');
-  bd.classList.remove('visible');
-  setTimeout(() => { bd.classList.remove('open'); document.body.style.overflow = ''; }, 250);
-}
-function psaBackdropClick(e) { if (e.target === document.getElementById('psa-backdrop')) closeAnalyserModal(); }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAnalyserModal(); });
+// Screen order (loading and confirm handled separately)
+const SCREENS = ['s0','s1','s2','s3','s4','s5','s6','s6b','s6c','s6d','s6e','s6f','s7','s8'];
+const TOTAL = SCREENS.length;
+let current = 0;
 
-// ── Step navigation ───────────────────────────────────────────────
-function psaGoStep(n) {
-  // Validate before advancing
-  if (n === 2 && psaCurrentStep === 1) {
-    if (psaFiles.length === 0 && !psaSkipped) return;
-  }
-  if (n === 3 && psaCurrentStep === 2) {
-    if (!psaValidateGate()) return;
-  }
-
-  // Hide current, show next
-  document.getElementById('psa-step-' + psaCurrentStep).style.display = 'none';
-  psaCurrentStep = n;
-  document.getElementById('psa-step-' + n).style.display = 'block';
-  document.getElementById('psa-modal').scrollTop = 0;
-
-  // Update progress bar
-  [1, 2, 3].forEach(i => {
-    const step = document.getElementById('prog-s' + i);
-    step.classList.remove('active', 'done');
-    if (i < n) step.classList.add('done');
-    if (i === n) step.classList.add('active');
-  });
-  [1, 2].forEach(i => {
-    const line = document.getElementById('prog-l' + i);
-    if (line) { line.classList.toggle('done', i < n); }
-  });
+// ── Progress ──────────────────────────────────────────────────────
+function renderProgress() {
+  const track = document.getElementById('progressTrack');
+  track.innerHTML = SCREENS.map((_, i) => {
+    const cls = i < current ? 'done' : i === current ? 'active' : '';
+    return `<div class="progress-pip ${cls}"></div>`;
+  }).join('');
 }
 
-// ── File handling ─────────────────────────────────────────────────
-let psaSkipped = false;
+// ── Navigation ────────────────────────────────────────────────────
+function goTo(idx) {
+  const from = document.getElementById(SCREENS[current]);
+  const to   = document.getElementById(SCREENS[idx]);
+  if (!to) return;
 
-function psaDragOver(e) { e.preventDefault(); document.getElementById('psa-drop').classList.add('drag-over'); }
-function psaDragLeave()  { document.getElementById('psa-drop').classList.remove('drag-over'); }
-function psaDrop(e) {
-  e.preventDefault();
-  document.getElementById('psa-drop').classList.remove('drag-over');
-  const files = Array.from(e.dataTransfer.files);
-  files.forEach(f => psaAddFile(f));
-}
-function psaFileSelect(e) {
-  Array.from(e.target.files).forEach(f => psaAddFile(f));
-  e.target.value = '';
-}
-function psaAddFile(f) {
-  if (psaFiles.length >= 10) return;
-  if (psaFiles.find(x => x.name === f.name)) return;
-  psaFiles.push(f);
-  psaRenderFiles();
-  psaSkipped = false;
-  document.getElementById('psa-btn-step1').disabled = false;
-}
-function psaRemoveFile(idx) {
-  psaFiles.splice(parseInt(idx), 1);
-  psaRenderFiles();
-  if (psaFiles.length === 0 && !psaSkipped) {
-    document.getElementById('psa-btn-step1').disabled = true;
-  }
-}
-function psaRenderFiles() {
-  const list = document.getElementById('psaFilesList');
-  list.innerHTML = psaFiles.map((f, i) =>
-    '<div class="psa-file-item">' +
-      '<div class="psa-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
-      '<span class="psa-file-name">' + f.name + '</span>' +
-      '<span class="psa-file-size">' + (f.size/1024).toFixed(0) + ' KB</span>' +
-      '<button class="psa-file-remove" data-idx="' + i + '" onclick="psaRemoveFile(this.dataset.idx)">' +
-        '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
-      '</button>' +
-    '</div>'
-  ).join('');
+  from.classList.remove('active');
+  from.classList.add('exit');
+  setTimeout(() => from.classList.remove('exit'), 500);
 
-  // Update drop zone label
-  const label = document.getElementById('psa-drop-label');
-  const remaining = 10 - psaFiles.length;
-  if (psaFiles.length >= 10) {
-    label.textContent = '10 files uploaded — maximum reached';
-    document.getElementById('psa-drop').style.opacity = '0.5';
-    document.getElementById('psa-drop').style.pointerEvents = 'none';
-  } else {
-    label.textContent = remaining === 3 ? 'Drop statements here' : remaining >= 7 ? 'Add more files — up to ' + remaining + ' remaining' : 'Add ' + remaining + ' more ' + (remaining === 1 ? 'file' : 'files') + ' — up to 10 total';
-    document.getElementById('psa-drop').style.opacity = '';
-    document.getElementById('psa-drop').style.pointerEvents = '';
-  }
-}
-function psaSkipUpload() {
-  psaSkipped = true;
-  document.getElementById('psa-btn-step1').disabled = false;
-  document.getElementById('psa-btn-step1').textContent = 'Continue without statements →';
-  psaGoStep(2);
+  current = idx;
+  to.classList.add('active');
+  renderProgress();
+
+  document.getElementById('backBtn').style.display = idx > 0 ? 'flex' : 'none';
+  document.getElementById('keyHint').style.display = ['s0','s5','s6','s7','sLoading','sConfirm'].includes(SCREENS[idx]) ? 'none' : 'flex';
+
+  // Auto-focus inputs
+  setTimeout(() => {
+    const inp = to.querySelector('.q-input, .otp-digit');
+    if (inp) inp.focus();
+  }, 450);
 }
 
-// ── Gate validation ───────────────────────────────────────────────
-function psaValidateGate() {
-  const email = document.getElementById('gate-email').value.trim();
-  const phone = document.getElementById('gate-phone').value.trim();
-  const first = document.getElementById('gate-firstname').value.trim();
-  const last  = document.getElementById('gate-lastname').value.trim();
-  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && phone.length >= 8 && first.length > 0 && last.length > 0;
-  document.getElementById('psa-btn-step2').disabled = !valid;
-  return valid;
-}
+function advance() { goTo(current + 1); }
+function goBack()   { if (current > 0) goTo(current - 1); }
 
-// ── Industry → show/hide ecom platform ───────────────────────────
-function psaIndustryChange() {
-  const val = document.getElementById('prof-industry').value;
-  const showEcom = ['ecommerce','retail_ecom'].includes(val);
-  document.getElementById('prof-ecom-wrap').style.display = showEcom ? 'block' : 'none';
-}
-// Show/hide ecom and POS based on channel selection
-document.addEventListener('change', function(e) {
-  if (e.target.classList.contains('psa-ch-channel')) {
-    const checked = Array.from(document.querySelectorAll('.psa-ch-channel:checked')).map(cb => cb.value);
-    const hasOnline   = checked.includes('online');
-    const hasInstore  = checked.includes('instore');
-    document.getElementById('prof-ecom-wrap').style.display = hasOnline ? 'block' : 'none';
-    const posWrap = document.getElementById('prof-pos-wrap');
-    if (posWrap) posWrap.style.display = hasInstore ? 'block' : 'none';
-  }
+// ── Keyboard ──────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (e.target.tagName === 'TEXTAREA') return;
+  const ctaId = 'cta' + SCREENS[current].toUpperCase().replace('S','S');
+  const btn = document.querySelector(`#${SCREENS[current]} .cta:not(:disabled)`);
+  if (btn) btn.click();
 });
 
-// ── Collect program context ───────────────────────────────────────
-function psaCollectContext() {
-  const get = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-  const checked = cls => Array.from(document.querySelectorAll('.' + cls + ':checked')).map(cb => cb.value).join(', ');
+// ── S0: Upload ────────────────────────────────────────────────────
+function onDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag-over'); }
+function onDragLeave()  { document.getElementById('uploadZone').classList.remove('drag-over'); }
+function onDrop(e)      { e.preventDefault(); document.getElementById('uploadZone').classList.remove('drag-over'); Array.from(e.dataTransfer.files).forEach(addFile); }
+function onFileSelect(e){ Array.from(e.target.files).forEach(addFile); e.target.value = ''; }
 
-  const parts = [
-    get('prof-industry')      ? 'Industry: ' + get('prof-industry') : '',
-    get('prof-revenue')       ? 'Annual revenue: ' + get('prof-revenue') : '',
-    get('prof-locations')     ? 'Locations: ' + get('prof-locations') : '',
-    get('prof-terminals')     ? 'Terminals: ' + get('prof-terminals') : '',
-    checked('psa-ch-channel') ? 'Payment channels: ' + checked('psa-ch-channel') : '',
-    get('prof-ecom')          ? 'eCommerce platform: ' + get('prof-ecom') : '',
-    get('prof-pos')           ? 'POS system: ' + get('prof-pos') : '',
-    get('prof-contract')      ? 'Contract situation: ' + get('prof-contract') : '',
-    get('prof-international') ? 'International sales: ' + get('prof-international') : '',
-    checked('psa-ch-fraud')   ? 'Fraud tools: ' + checked('psa-ch-fraud') : '',
-    get('prof-painpoints')    ? 'Pain points: ' + get('prof-painpoints') : '',
-    get('prof-other')         ? 'Additional info: ' + get('prof-other') : '',
-    'Name: ' + get('gate-firstname') + ' ' + get('gate-lastname'),
-    'Email: ' + get('gate-email'),
-    'Phone: ' + get('gate-phone'),
-  ].filter(Boolean);
+function addFile(f) {
+  if (data.files.length >= 10) return;
+  if (data.files.find(x => x.name === f.name)) return;
+  data.files.push(f);
+  renderChips();
+  document.getElementById('ctaS0').disabled = false;
+}
+function removeFile(i) {
+  data.files.splice(i, 1);
+  renderChips();
+  if (data.files.length === 0) document.getElementById('ctaS0').disabled = true;
+}
+function renderChips() {
+  document.getElementById('fileChips').innerHTML = data.files.map((f, i) =>
+    `<div class="file-chip">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      ${f.name.length > 28 ? f.name.slice(0,26)+'…' : f.name}
+      <button class="file-chip-remove" onclick="removeFile(${i})">×</button>
+    </div>`
+  ).join('');
+}
+function skipUpload() { data.skippedUpload = true; advance(); }
 
-  return parts.join('\n');
+// ── S1: Name ──────────────────────────────────────────────────────
+function validateS1() {
+  data.firstname = document.getElementById('inp-firstname').value.trim();
+  document.getElementById('ctaS1').disabled = data.firstname.length < 2;
 }
 
-// ── File to base64 ────────────────────────────────────────────────
-function psaToB64(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result.split(',')[1]);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
+// ── S2: Email ─────────────────────────────────────────────────────
+function validateS2() {
+  data.email = document.getElementById('inp-email').value.trim();
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email);
+  document.getElementById('ctaS2').disabled = !valid;
 }
 
-// ── Submit all ────────────────────────────────────────────────────
-async function psaSubmitAll() {
-  const programContext = psaCollectContext();
+function skipEmail() {
+  // Skip email and OTP entirely — jump straight to phone
+  data.emailVerified = false;
+  // Skip s2 (email) and s3 (OTP) — go to s4 (phone)
+  const from = document.getElementById(SCREENS[current]);
+  from.classList.remove('active');
+  from.classList.add('exit');
+  setTimeout(() => from.classList.remove('exit'), 500);
+  current = 4; // s4 = phone
+  document.getElementById(SCREENS[current]).classList.add('active');
+  renderProgress();
+  document.getElementById('backBtn').style.display = 'flex';
+  document.getElementById('keyHint').style.display = 'flex';
+  setTimeout(() => {
+    const inp = document.getElementById(SCREENS[current]).querySelector('.q-input');
+    if (inp) inp.focus();
+  }, 450);
+}
 
-  // Hide step 3, show loading
-  document.getElementById('psa-step-3').style.display = 'none';
-  document.getElementById('psa-loading-panel').classList.add('show');
-  document.getElementById('psa-modal').scrollTop = 0;
+async function sendOtp(isResend) {
+  const btn = document.getElementById('ctaS2');
+  const status = document.getElementById('statusS2');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  status.className = 'status-msg info';
+  status.textContent = '';
 
-  const ids = ['psa-s1','psa-s2','psa-s3','psa-s4'];
-  let stepIdx = 0;
-  document.getElementById(ids[0]).className = 'psa-step active';
-  const iv = setInterval(() => {
-    document.getElementById(ids[stepIdx]).className = 'psa-step done';
-    stepIdx++;
-    if (stepIdx < ids.length) document.getElementById(ids[stepIdx]).className = 'psa-step active';
-  }, 2800);
+  try {
+    const res = await fetch('/api/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email, firstName: data.firstname })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Failed to send');
+
+    otp.sent = true;
+    document.getElementById('otpSub').textContent = `We sent a 6-digit code to ${data.email}.`;
+    advance(); // go to S3
+    btn.textContent = 'Send verification code';
+    btn.disabled = false;
+
+  } catch(err) {
+    status.className = 'status-msg error';
+    status.textContent = 'Could not send code: ' + err.message;
+    btn.textContent = 'Send verification code';
+    btn.disabled = false;
+  }
+}
+
+// ── S3: OTP ───────────────────────────────────────────────────────
+function otpKey(e, idx) {
+  const digits = document.querySelectorAll('.otp-digit');
+  if (e.key === 'Backspace') {
+    if (!digits[idx].value && idx > 0) { digits[idx-1].value = ''; digits[idx-1].focus(); }
+    validateOtp();
+  }
+  if (e.key === 'ArrowLeft' && idx > 0) digits[idx-1].focus();
+  if (e.key === 'ArrowRight' && idx < 5) digits[idx+1].focus();
+}
+function otpInput(e, idx) {
+  const digits = document.querySelectorAll('.otp-digit');
+  const val = e.target.value.replace(/[^0-9]/g,'');
+  e.target.value = val.slice(-1);
+  if (val && idx < 5) digits[idx+1].focus();
+  // Handle paste
+  if (val.length > 1) {
+    val.split('').slice(0,6).forEach((c, i) => { if (digits[i]) digits[i].value = c; });
+    digits[Math.min(5, val.length-1)].focus();
+  }
+  digits[idx].classList.toggle('filled', !!e.target.value);
+  validateOtp();
+}
+function validateOtp() {
+  const code = Array.from(document.querySelectorAll('.otp-digit')).map(d => d.value).join('');
+  document.getElementById('ctaS3').disabled = code.length < 6;
+}
+async function verifyOtp() {
+  const code = Array.from(document.querySelectorAll('.otp-digit')).map(d => d.value).join('');
+  const btn = document.getElementById('ctaS3');
+  const status = document.getElementById('statusS3');
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  status.textContent = '';
+
+  try {
+    const res = await fetch('/api/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email, verify: code })
+    });
+    const d = await res.json();
+
+    if (!res.ok || !d.valid) {
+      status.className = 'status-msg error';
+      status.textContent = 'Incorrect code — please try again.';
+      btn.disabled = false; btn.textContent = 'Verify code';
+      return;
+    }
+
+    data.emailVerified = true;
+    status.className = 'status-msg success';
+    status.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email verified';
+    setTimeout(advance, 600);
+
+  } catch(err) {
+    status.className = 'status-msg error';
+    status.textContent = 'Verification failed. Try again.';
+    btn.disabled = false; btn.textContent = 'Verify code';
+  }
+}
+
+// ── S4: Phone ─────────────────────────────────────────────────────
+function validateS4() {
+  data.phone = document.getElementById('inp-phone').value.trim();
+  document.getElementById('ctaS4').disabled = data.phone.length < 8;
+}
+
+// ── S5: Industry (single select) ─────────────────────────────────
+function selectChoice(el, key, val) {
+  el.closest('.choice-grid, .screen').querySelectorAll('.choice:not(.multi)').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  data[key] = val;
+  const cta = el.closest('.screen').querySelector('.cta');
+  if (cta) cta.disabled = false;
+}
+
+// ── Conditional navigation ────────────────────────────────────────
+function advanceFromChannels() {
+  // After channels: go to ecom if online selected, else terminal if instore, else LCR
+  if (data.channels.includes('online')) {
+    goTo(SCREENS.indexOf('s6b'));
+  } else if (data.channels.includes('instore')) {
+    goTo(SCREENS.indexOf('s6c'));
+  } else {
+    goTo(SCREENS.indexOf('s6e')); // skip to LCR
+  }
+}
+
+function advanceFromEcom() {
+  // After ecom platform: go to terminal setup if instore, else LCR
+  if (data.channels.includes('instore')) {
+    goTo(SCREENS.indexOf('s6c'));
+  } else {
+    goTo(SCREENS.indexOf('s6e'));
+  }
+}
+
+function advanceFromTerminal() {
+  // After terminal setup: if integrated go to POS, else go to LCR
+  if (data.terminalSetup === 'integrated') {
+    goTo(SCREENS.indexOf('s6d'));
+  } else {
+    goTo(SCREENS.indexOf('s6e'));
+  }
+}
+
+// Override advance() for screens that need custom back logic
+const _origGoTo = goTo;
+// Back button from s6b should go back to s6
+// Back button from s6c should go back to s6b (if online) or s6
+// These are handled naturally by the SCREENS array order
+function toggleChoice(el, key, val) {
+  el.classList.toggle('selected');
+  if (el.classList.contains('selected')) {
+    if (!data[key].includes(val)) data[key].push(val);
+  } else {
+    data[key] = data[key].filter(v => v !== val);
+  }
+  const cta = el.closest('.screen').querySelector('.cta');
+  if (cta) cta.disabled = data[key].length === 0;
+}
+
+// ── S7: Revenue (single select — auto-advance) ────────────────────
+function selectChoiceAuto(el, key, val) {
+  selectChoice(el, key, val);
+  setTimeout(advance, 350);
+}
+// Wire revenue choices for auto-advance
+document.querySelectorAll('#s7 .choice').forEach(el => {
+  const orig = el.getAttribute('onclick');
+  el.setAttribute('onclick', orig.replace('selectChoice', 'selectChoiceAuto'));
+});
+
+// ── S8: Pain ──────────────────────────────────────────────────────
+function validateS8() {
+  data.pain = document.getElementById('inp-pain').value.trim();
+  // Pain is optional — CTA always enabled on S8, skip link also available
+}
+
+// ── Submit ────────────────────────────────────────────────────────
+async function submitAll() {
+  data.pain = document.getElementById('inp-pain').value.trim();
+
+  // Switch to loading screen
+  const from = document.getElementById(SCREENS[current]);
+  from.classList.remove('active');
+  const loading = document.getElementById('sLoading');
+  loading.classList.add('active');
+  document.getElementById('backBtn').style.display = 'none';
+  document.getElementById('keyHint').style.display = 'none';
+
+  // Animate loading steps
+  const lsIds = ['ls0','ls1','ls2','ls3'];
+  let lsIdx = 0;
+  const lsIv = setInterval(() => {
+    document.getElementById(lsIds[lsIdx]).className = 'loading-step done';
+    lsIdx++;
+    if (lsIdx < lsIds.length) document.getElementById(lsIds[lsIdx]).className = 'loading-step active';
+  }, 3000);
+
+  // Build program context string
+  const programContext = [
+    `Name: ${data.firstname}`,
+    `Email: ${data.email}`,
+    `Phone: ${data.phone}`,
+    data.industry       ? `Industry: ${data.industry}` : '',
+    data.channels.length ? `Payment channels: ${data.channels.join(', ')}` : '',
+    data.ecomPlatform   ? `eCommerce platform: ${data.ecomPlatform}` : '',
+    data.terminalSetup  ? `Terminal setup: ${data.terminalSetup}` : '',
+    data.posSystem      ? `POS system: ${data.posSystem}` : '',
+    data.lcrStatus      ? `LCR status: ${data.lcrStatus}` : '',
+    data.pricingModel   ? `Current pricing model: ${data.pricingModel}` : '',
+    data.revenue        ? `Annual revenue: ${data.revenue}` : '',
+    data.pain           ? `Biggest frustration: ${data.pain}` : '',
+    data.skippedUpload  ? 'Statements: not uploaded' : `Statements uploaded: ${data.files.length} file(s)`,
+  ].filter(Boolean).join('\n');
 
   const system = `You are a senior payments consultant based in Australia with 15+ years analysing merchant statements and payment infrastructure. Analyse the provided information and return ONLY valid JSON with no markdown, no backticks, no preamble.
 
-IMPORTANT: The merchant has provided detailed business context. You MUST reference their specific setup in your analysis — name their actual POS system, eCommerce platform, industry, and fraud tools. Tailor ALL recommendations to their actual situation.
+IMPORTANT: Reference the merchant's specific industry, channels, and pain points in your analysis. All recommendations must be tailored to their actual situation.
 
 Return this exact structure:
-{"provider":"string","period":"string","volume":null,"transactions":null,"totalFees":null,"effectiveRate":null,"perTransactionFee":null,"monthlyFee":null,"terminalFees":null,"pricingModel":"blended|ic_plus|ic_plusplus|unknown","lcrStatus":"on|off|unknown","feeBreakdown":[{"label":"string","amount":0,"note":null}],"alerts":[{"type":"warn|good|info","heading":"string","body":"string"}],"executiveSummary":"2-3 sentence summary referencing their specific industry and setup","pricingModelAnalysis":"2-3 paragraphs on their pricing model and whether it suits their volume and channel mix","savingsOpportunity":"Specific quantified savings with the maths shown","lcrAnalysis":"LCR status and impact on their specific transaction mix","keyRecommendation":"The single most important next step, referencing their actual setup","nextSteps":["step 1","step 2","step 3"],"benchmarkComment":"How their rate compares to similar businesses in their industry in Australia 2025/2026","stackAssessment":"REQUIRED: 2-3 paragraph strategic assessment naming their specific vendors and identifying real gaps","stackItems":[{"label":"string","value":"string","status":"ok|warn|gap"}]}`;
+{"provider":"string","period":"string","volume":null,"transactions":null,"totalFees":null,"effectiveRate":null,"perTransactionFee":null,"monthlyFee":null,"terminalFees":null,"pricingModel":"blended|ic_plus|ic_plusplus|unknown","lcrStatus":"on|off|unknown","feeBreakdown":[{"label":"string","amount":0,"note":null}],"alerts":[{"type":"warn|good|info","heading":"string","body":"string"}],"executiveSummary":"string","pricingModelAnalysis":"string","savingsOpportunity":"string","lcrAnalysis":"string","keyRecommendation":"string","nextSteps":["step 1","step 2","step 3"],"benchmarkComment":"string","stackAssessment":"string","stackItems":[{"label":"string","value":"string","status":"ok|warn|gap"}]}`;
 
   try {
     let content = [];
-    const programSuffix = '\n\nMERCHANT BUSINESS PROFILE:\n' + programContext;
+    const suffix = '\n\nMERCHANT PROFILE:\n' + programContext;
 
-    if (psaFiles.length > 0) {
-      // Send all uploaded files
-      for (const file of psaFiles) {
-        const b64 = await psaToB64(file);
-        const mt = file.type === 'application/pdf' ? 'application/pdf' : file.type;
-        if (file.type === 'application/pdf') {
+    if (data.files.length > 0) {
+      for (const file of data.files) {
+        const b64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result.split(',')[1]);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        const mt = file.type || 'application/octet-stream';
+        if (mt === 'application/pdf') {
           content.push({ type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } });
-        } else {
+        } else if (mt.startsWith('image/')) {
           content.push({ type:'image', source:{ type:'base64', media_type:mt, data:b64 } });
         }
       }
-      content.push({ type:'text', text:'Analyse these merchant statements and return only JSON.' + programSuffix });
+      content.push({ type:'text', text:'Analyse these merchant statements.' + suffix });
     } else {
-      content = [{ type:'text', text:'The merchant has not uploaded statements. Analyse based on their business profile and return JSON. Note in executiveSummary that statements were not provided.' + programSuffix }];
+      content = [{ type:'text', text:'No statements uploaded. Analyse based on merchant profile only.' + suffix }];
     }
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1120,208 +1024,41 @@ Return this exact structure:
     });
 
     if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error ' + res.status); }
-    const data = await res.json();
-    const raw = (data.content.find(b => b.type === 'text')?.text || '').replace(/```json|```/g,'').trim();
+    const apiData = await res.json();
+    const raw = (apiData.content.find(b => b.type==='text')?.text || '').replace(/```json|```/g,'').trim();
     const report = JSON.parse(raw);
 
-    // Post to submission API
+    // Post to submission pipeline
     await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        report,
-        programContext,
-        submission: {
-          name: document.getElementById('gate-firstname').value + ' ' + document.getElementById('gate-lastname').value,
-          email: document.getElementById('gate-email').value,
-          phone: document.getElementById('gate-phone').value,
-          submittedAt: new Date().toISOString()
-        }
-      })
+      body: JSON.stringify({ report, programContext, submission: { name: data.firstname, email: data.email, phone: data.phone, submittedAt: new Date().toISOString() } })
     }).catch(() => null);
 
-    clearInterval(iv);
-    ids.forEach(id => document.getElementById(id).className = 'psa-step done');
+    clearInterval(lsIv);
+    lsIds.forEach(id => document.getElementById(id).className = 'loading-step done');
 
     setTimeout(() => {
-      document.getElementById('psa-loading-panel').classList.remove('show');
-      const fmtD = n => n != null ? '$' + Number(n).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+      loading.classList.remove('active');
+      const confirm = document.getElementById('sConfirm');
+      confirm.classList.add('active');
       const fmtP = n => n != null ? n.toFixed(2) + '%' : '—';
-      document.getElementById('psa-confirm-details').innerHTML =
-        '<div class="psa-confirm-detail-row"><span class="psa-confirm-detail-key">Provider</span><span class="psa-confirm-detail-val">' + (report.provider || 'Analysed') + '</span></div>' +
-        '<div class="psa-confirm-detail-row"><span class="psa-confirm-detail-key">Effective rate</span><span class="psa-confirm-detail-val">' + fmtP(report.effectiveRate) + '</span></div>' +
-        '<div class="psa-confirm-detail-row"><span class="psa-confirm-detail-key">Total fees</span><span class="psa-confirm-detail-val">' + fmtD(report.totalFees) + '</span></div>' +
-        '<div class="psa-confirm-detail-row"><span class="psa-confirm-detail-key">Report sent to</span><span class="psa-confirm-detail-val">' + document.getElementById('gate-email').value + '</span></div>';
-      document.getElementById('psa-confirm-panel').classList.add('show');
-    }, 400);
+      const fmtD = n => n != null ? '$' + Number(n).toLocaleString('en-AU', {minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+      document.getElementById('confirmDetail').innerHTML =
+        '<div class="confirm-row"><span class="confirm-row-key">Name</span><span class="confirm-row-val">' + data.firstname + '</span></div>' +
+        '<div class="confirm-row"><span class="confirm-row-key">Email</span><span class="confirm-row-val">' + (data.email || '—') + '</span></div>';
+    }, 500);
 
   } catch(err) {
-    clearInterval(iv);
-    document.getElementById('psa-loading-panel').classList.remove('show');
-    document.getElementById('psa-step-3').style.display = 'block';
-    const eb = document.getElementById('psa-error');
-    if (eb) { eb.textContent = 'Submission failed: ' + err.message; eb.classList.add('show'); }
+    clearInterval(lsIv);
+    loading.classList.remove('active');
+    from.classList.add('active');
+    alert('Something went wrong: ' + err.message);
   }
 }
 
-
-// ── OTP verification ──────────────────────────────────────────────
-let psaOtpCode = null;
-let psaEmailVerified = false;
-
-async function psaGateNext() {
-  if (!psaValidateGate()) return;
-
-  if (psaEmailVerified) {
-    psaGoStep(3);
-    return;
-  }
-
-  // Send OTP
-  await psaSendOtp(false);
-}
-
-async function psaSendOtp(isResend) {
-  const email = document.getElementById('gate-email').value.trim();
-  const firstName = document.getElementById('gate-firstname').value.trim();
-  const btn = document.getElementById('psa-btn-step2');
-
-  btn.disabled = true;
-  btn.textContent = 'Sending...';
-
-  try {
-    const res = await fetch('/api/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, firstName })
-    });
-    const data = await res.json();
-
-    if (!res.ok) throw new Error(data.error || 'Failed to send code');
-
-    // Show OTP panel
-    document.getElementById('otp-panel').style.display = 'block';
-    document.getElementById('otp-sent-note').textContent =
-      (isResend ? 'A new code has been sent to ' : 'A 6-digit code has been sent to ') + email + '. Check your inbox.';
-    document.getElementById('otp-input').value = '';
-    document.getElementById('otp-error').textContent = '';
-    document.getElementById('otp-success').style.display = 'none';
-
-    // Lock the email field
-    document.getElementById('gate-email').disabled = true;
-
-    btn.textContent = 'Verify code';
-    btn.disabled = false;
-    btn.onclick = psaVerifyOtp;
-
-  } catch(err) {
-    document.getElementById('otp-error').textContent = 'Could not send code: ' + err.message;
-    btn.textContent = 'Send verification code';
-    btn.disabled = false;
-    btn.onclick = psaGateNext;
-  }
-}
-
-async function psaVerifyOtp() {
-  const entered = document.getElementById('otp-input').value.trim();
-  const errorEl = document.getElementById('otp-error');
-  errorEl.textContent = '';
-
-  if (entered.length !== 6) {
-    errorEl.textContent = 'Please enter the full 6-digit code.';
-    return;
-  }
-
-  const btn = document.getElementById('psa-btn-step2');
-  btn.disabled = true;
-  btn.textContent = 'Verifying...';
-
-  try {
-    const res = await fetch('/api/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: document.getElementById('gate-email').value.trim(),
-        verify: entered
-      })
-    });
-    const data = await res.json();
-
-    if (!res.ok || !data.valid) {
-      errorEl.textContent = 'Incorrect code. Please try again.';
-      btn.disabled = false;
-      btn.textContent = 'Verify code';
-      return;
-    }
-
-    // Verified!
-    psaEmailVerified = true;
-    document.getElementById('otp-success').style.display = 'flex';
-    document.getElementById('otp-input').disabled = true;
-    document.getElementById('otp-resend-btn').style.display = 'none';
-    errorEl.textContent = '';
-
-    btn.textContent = 'Continue';
-    btn.disabled = false;
-    btn.onclick = function() { psaGoStep(3); };
-
-  } catch(err) {
-    errorEl.textContent = 'Verification failed. Please try again.';
-    btn.disabled = false;
-    btn.textContent = 'Verify code';
-  }
-}
-
-function psaOtpInput(el) {
-  // Only allow digits
-  el.value = el.value.replace(/[^0-9]/g, '');
-  document.getElementById('otp-error').textContent = '';
-}
-
-// ── Reset ─────────────────────────────────────────────────────────
-function psaReset() {
-  psaFiles = []; psaCurrentStep = 1; psaSkipped = false;
-  document.getElementById('psa-confirm-panel').classList.remove('show');
-  document.getElementById('psa-loading-panel').classList.remove('show');
-  [1,2,3].forEach(n => {
-    const el = document.getElementById('psa-step-' + n);
-    if (el) el.style.display = n === 1 ? 'block' : 'none';
-  });
-  document.getElementById('psaFilesList').innerHTML = '';
-  document.getElementById('psa-drop-label').textContent = 'Drop statements here';
-  document.getElementById('psa-drop').style.opacity = '';
-  document.getElementById('psa-drop').style.pointerEvents = '';
-  document.getElementById('psa-btn-step1').disabled = true;
-  document.getElementById('psa-file-input').value = '';
-  ['gate-firstname','gate-lastname','gate-email','gate-phone'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  ['prof-industry','prof-revenue','prof-locations','prof-terminals','prof-ecom','prof-pos','prof-contract','prof-international','prof-painpoints','prof-other'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  document.querySelectorAll('.psa-ch-channel, .psa-ch-fraud').forEach(cb => cb.checked = false);
-  // Reset OTP
-  psaEmailVerified = false; psaOtpCode = null;
-  const otpPanel = document.getElementById('otp-panel');
-  if (otpPanel) otpPanel.style.display = 'none';
-  const otpInput = document.getElementById('otp-input');
-  if (otpInput) { otpInput.value = ''; otpInput.disabled = false; }
-  const otpErr = document.getElementById('otp-error');
-  if (otpErr) otpErr.textContent = '';
-  const otpSucc = document.getElementById('otp-success');
-  if (otpSucc) otpSucc.style.display = 'none';
-  const gateEmail = document.getElementById('gate-email');
-  if (gateEmail) gateEmail.disabled = false;
-  const btn2 = document.getElementById('psa-btn-step2');
-  if (btn2) { btn2.textContent = 'Send verification code'; btn2.onclick = psaGateNext; btn2.disabled = true; }
-  document.getElementById('prof-ecom-wrap').style.display = 'none';
-  [1,2,3].forEach(i => {
-    const s = document.getElementById('prog-s' + i);
-    s.classList.remove('active','done');
-    if (i === 1) s.classList.add('active');
-  });
-  [1,2].forEach(i => { const l = document.getElementById('prog-l' + i); if (l) l.classList.remove('done'); });
-}
+// ── Init ──────────────────────────────────────────────────────────
+renderProgress();
 </script>
 </body>
 </html>
