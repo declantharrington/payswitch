@@ -620,7 +620,12 @@ async function psaRunAnalysis() {
 
   const system = `You are a senior payments consultant based in Australia with 15+ years analysing merchant statements and payment infrastructure. Analyse the provided information and return ONLY valid JSON with no markdown, no backticks, no preamble.
 
-${hasProgramContext ? 'The merchant has also provided a description of their payments program. Use this alongside the statement to produce a more complete review — covering not just fees but also stack gaps, integration risks, and strategic recommendations.' : ''}
+${hasProgramContext ? `IMPORTANT: The merchant has provided both a statement AND a description of their payments program. You MUST use both inputs in your analysis. The program description contains critical context about their stack, vendors, platforms, and fraud tools that the statement alone cannot show. Your analysis must:
+1. Reference specific details from the program description by name (e.g. their actual POS system, eCommerce platform, fraud tool)
+2. Identify gaps, risks, or opportunities specific to their described stack
+3. Tailor ALL recommendations to their actual setup — not generic advice
+4. Populate stackItems with every component they mentioned, assessed as ok/warn/gap
+5. Write stackAssessment as a substantive strategic review of their full payments infrastructure` : ''}
 
 Return this exact structure:
 {
@@ -637,14 +642,14 @@ Return this exact structure:
   "lcrStatus": "on|off|unknown",
   "feeBreakdown": [{"label":"string","amount":number,"note":"string_or_null"}],
   "alerts": [{"type":"warn|good|info","heading":"string","body":"string"}],
-  "executiveSummary": "2-3 sentence plain-English summary",
-  "pricingModelAnalysis": "2-3 paragraphs on their pricing model",
-  "savingsOpportunity": "Specific quantified savings with maths",
-  "lcrAnalysis": "LCR status and impact",
-  "keyRecommendation": "Single most important next step",
+  "executiveSummary": "2-3 sentence plain-English summary that references their specific setup if program context was provided",
+  "pricingModelAnalysis": "2-3 paragraphs on their pricing model and whether it suits their volume and channel mix",
+  "savingsOpportunity": "Specific quantified savings with maths. Show the calculation.",
+  "lcrAnalysis": "LCR status and what enabling/disabling it would mean for their specific transaction mix",
+  "keyRecommendation": "The single most important next step, written as if sitting across the table. Reference their actual setup.",
   "nextSteps": ["step 1","step 2","step 3"],
-  "benchmarkComment": "How their rate compares to AU market 2025/2026",
-  "stackAssessment": "2-3 paragraph strategic assessment of their payments stack — gaps, risks, and opportunities beyond just the rate. Only include if program context was provided.",
+  "benchmarkComment": "How their rate compares to what businesses their size and type pay in Australia in 2025/2026",
+  "stackAssessment": "REQUIRED if program context provided: 2-3 paragraph strategic assessment of their specific payments stack — name their actual vendors, identify real gaps, call out integration risks and opportunities. Be specific, not generic.",
   "stackItems": [{"label":"string","value":"string","status":"ok|warn|gap"}]
 }`;
 
