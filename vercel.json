@@ -2,6 +2,9 @@
   "functions": {
     "api/submit.js": {
       "maxDuration": 30
+    },
+    "api/send-otp.js": {
+      "maxDuration": 10
     }
   }
 }
