@@ -747,20 +747,24 @@
 }
 /* ── CYCLING HEADLINE ── */
 .cycler-wrap {
-  display: inline;
+  display: inline-block;
   position: relative;
+  min-width: 320px;
+  line-height: 1.05;
 }
 
 .cycler-word {
-  display: inline;
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
   font-size: 1.25em;
   color: var(--blue-glow);
   font-weight: 800;
   letter-spacing: -0.04em;
   white-space: nowrap;
   opacity: 0;
-  transition: opacity 0.55s ease;
+  transform: translateY(10px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
   pointer-events: none;
   text-shadow: 0 0 40px rgba(58,138,255,0.4);
 }
