@@ -1,13 +1,12 @@
-// api/analyse.js
-// Secure server-side proxy for Anthropic API calls.
-// The ANTHROPIC_API_KEY environment variable is set in Vercel — never in client code.
+// api/analyse.js — streaming version
+// Pipes Anthropic's streaming response directly to the client,
+// so Vercel never waits for the full response before returning.
 
 export const config = {
-  maxDuration: 60, // allow up to 60s for large statement analysis
+  maxDuration: 60,
 };
 
 export default async function handler(req, res) {
-  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -18,8 +17,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
-  // Forward the request body straight to Anthropic
-  // The client sends the same payload shape it used to send directly
   const { model, max_tokens, messages, system } = req.body;
 
   if (!messages || !Array.isArray(messages)) {
@@ -37,6 +34,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: model || 'claude-sonnet-4-20250514',
         max_tokens: max_tokens || 4096,
+        stream: true,
         ...(system ? { system } : {}),
         messages,
       }),
@@ -48,11 +46,54 @@ export default async function handler(req, res) {
       return res.status(anthropicRes.status).json({ error: 'Upstream API error', detail: errorText });
     }
 
-    const data = await anthropicRes.json();
-    return res.status(200).json(data);
+    // Stream the response straight through to the client
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const reader = anthropicRes.body.getReader();
+    const decoder = new TextDecoder();
+
+    // Accumulate the full text so we can return it as a single JSON blob at the end
+    let fullText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+
+      // Parse SSE lines from Anthropic
+      for (const line of chunk.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+
+        try {
+          const evt = JSON.parse(data);
+          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+            fullText += evt.delta.text;
+            // Send a keepalive ping so Vercel knows the connection is alive
+            res.write(': ping\n\n');
+          }
+          if (evt.type === 'message_stop') {
+            // Send the complete response as a final SSE event
+            res.write(`data: ${JSON.stringify({ done: true, text: fullText })}\n\n`);
+          }
+        } catch (_) {
+          // ignore malformed lines
+        }
+      }
+    }
+
+    res.end();
 
   } catch (err) {
-    console.error('analyse.js fetch error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('analyse.js error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    } else {
+      res.end();
+    }
   }
 }
