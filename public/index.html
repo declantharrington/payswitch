@@ -750,15 +750,14 @@
   display: inline-block;
   position: relative;
   min-width: 320px;
-  line-height: 1.05;
-}
-}
+  height: 1.2em;
+  vertical-align: bottom;
 }
 
 .cycler-word {
   position: absolute;
   left: 0;
-  top: 0;
+  bottom: 0;
   font-size: 1.25em;
   color: var(--blue-glow);
   font-weight: 800;
@@ -769,10 +768,6 @@
   transition: opacity 0.55s ease, transform 0.55s ease;
   pointer-events: none;
   text-shadow: 0 0 40px rgba(58,138,255,0.4);
-}
-
-.cycler-word.active {
-  opacity: 1;
 }
 
 .cycler-word.active {
