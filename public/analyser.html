@@ -800,9 +800,9 @@ async function submitAll() {
     data.skippedUpload   ? 'Statements: not uploaded' : `Statements uploaded: ${data.files.length} file(s)`,
   ].filter(Boolean).join('\n');
   const system = `You are a senior payments consultant based in Australia with 15+ years analysing merchant statements and payment infrastructure. Analyse the provided information and return ONLY valid JSON with no markdown, no backticks, no preamble.
-IMPORTANT: Reference the merchant's specific industry, channels, and pain points in your analysis. All recommendations must be tailored to their actual situation.
-Return this exact structure:
-{"provider":"string","period":"string","volume":null,"transactions":null,"totalFees":null,"effectiveRate":null,"perTransactionFee":null,"monthlyFee":null,"terminalFees":null,"pricingModel":"blended|ic_plus|ic_plusplus|unknown","lcrStatus":"on|off|unknown","feeBreakdown":[{"label":"string","amount":0,"note":null}],"alerts":[{"type":"warn|good|info","heading":"string","body":"string"}],"executiveSummary":"string","pricingModelAnalysis":"string","savingsOpportunity":"string","lcrAnalysis":"string","keyRecommendation":"string","nextSteps":["step 1","step 2","step 3"],"benchmarkComment":"string","stackAssessment":"string","stackItems":[{"label":"string","value":"string","status":"ok|warn|gap"}]}`;
+IMPORTANT: Reference the merchant's specific industry, channels, and pain points. All recommendations must be tailored to their actual situation.
+Return this exact structure and nothing else:
+{"provider":"string or unknown","period":"string or unknown","effectiveRate":null,"totalFees":null,"volume":null,"pricingModel":"blended|ic_plus|ic_plusplus|unknown","lcrStatus":"on|off|unknown","executiveSummary":"2-3 sentence plain English summary of the merchant's current payments situation","savingsOpportunity":"1-2 sentence estimate of potential savings and how","keyRecommendation":"The single most important action this merchant should take","redFlags":["flag 1","flag 2"],"nextSteps":["step 1","step 2","step 3"]}`;
   try {
     let content = [];
     const suffix = '\n\nMERCHANT PROFILE:\n' + programContext;
@@ -828,7 +828,7 @@ Return this exact structure:
     const res = await fetch('/api/analyse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model:'claude-sonnet-4-5', max_tokens:4000, system, messages:[{ role:'user', content }] })
+      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:4000, system, messages:[{ role:'user', content }] })
     });
     if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error ' + res.status); }
     const apiData = await res.json();
