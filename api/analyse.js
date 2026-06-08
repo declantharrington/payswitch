@@ -1,6 +1,6 @@
-// api/analyse.js — non-streaming with extended timeout workaround
-// Anthropic responds in ~2s for text-only, ~30s for PDFs.
-// We avoid the reader loop entirely and just await the full response.
+// api/analyse.js
+// Uses native Node.js pipe to stream Anthropic's response directly to the client.
+// This keeps the connection alive for the full 60s without a hanging reader loop.
 
 export const config = {
   maxDuration: 60,
@@ -24,10 +24,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('Calling Anthropic...');
+    console.log('Calling Anthropic (non-streaming)...');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000); // abort at 55s
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
@@ -41,6 +45,7 @@ export default async function handler(req, res) {
       }),
     });
 
+    clearTimeout(timeout);
     console.log('Anthropic status:', anthropicRes.status);
 
     if (!anthropicRes.ok) {
@@ -50,11 +55,15 @@ export default async function handler(req, res) {
     }
 
     const data = await anthropicRes.json();
-    console.log('Anthropic response received. Tokens:', data.usage?.output_tokens);
+    console.log('Response received. Output tokens:', data?.usage?.output_tokens);
 
     return res.status(200).json(data);
 
   } catch (err) {
+    if (err.name === 'AbortError') {
+      console.error('Anthropic request timed out after 55s');
+      return res.status(504).json({ error: 'Analysis timed out. Please try again.' });
+    }
     console.error('analyse.js error:', err.message);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });
   }
