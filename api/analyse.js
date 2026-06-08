@@ -3,7 +3,7 @@
 // This keeps the connection alive for the full 60s without a hanging reader loop.
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 120,
 };
 
 export default async function handler(req, res) {
