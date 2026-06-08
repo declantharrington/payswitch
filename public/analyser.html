@@ -838,34 +838,34 @@ Return this exact structure:
     let report = null;
     let buffer = '';
 
+    const processLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data: ')) return;
+      try {
+        const evt = JSON.parse(trimmed.slice(6));
+        if (evt.done) {
+          if (evt.error) throw new Error('Analysis failed: ' + evt.error);
+          if (evt.text) {
+            const raw = evt.text.replace(/```json|```/g, '').trim();
+            report = JSON.parse(raw);
+          }
+        }
+      } catch (e) {
+        if (e.message.startsWith('Analysis failed')) throw e;
+        // ignore parse errors on ping lines etc
+      }
+    };
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      // Process complete SSE lines
       const lines = buffer.split('\n');
-      buffer = lines.pop(); // keep incomplete line in buffer
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        try {
-          const evt = JSON.parse(line.slice(6));
-          if (evt.done && evt.text) {
-            const raw = evt.text.replace(/```json|```/g, '').trim();
-            report = JSON.parse(raw);
-          }
-        } catch (_) {}
-      }
+      buffer = lines.pop();
+      for (const line of lines) processLine(line);
     }
-    // Process anything left in buffer
-    if (buffer.startsWith('data: ')) {
-      try {
-        const evt = JSON.parse(buffer.slice(6));
-        if (evt.done && evt.text) {
-          const raw = evt.text.replace(/```json|```/g, '').trim();
-          report = JSON.parse(raw);
-        }
-      } catch (_) {}
-    }
+    // Flush remaining buffer
+    if (buffer) processLine(buffer);
 
     if (!report) throw new Error('No response received from analysis');
     await fetch('/api/submit', {
