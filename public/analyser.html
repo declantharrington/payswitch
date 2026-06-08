@@ -831,9 +831,43 @@ Return this exact structure:
       body: JSON.stringify({ model:'claude-sonnet-4-5', max_tokens:4000, system, messages:[{ role:'user', content }] })
     });
     if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error ' + res.status); }
-    const apiData = await res.json();
-    const raw = (apiData.content.find(b => b.type==='text')?.text || '').replace(/```json|```/g,'').trim();
-    const report = JSON.parse(raw);
+
+    // Read streaming response — accumulate until done event
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let report = null;
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // Process complete SSE lines
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line in buffer
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.done && evt.text) {
+            const raw = evt.text.replace(/```json|```/g, '').trim();
+            report = JSON.parse(raw);
+          }
+        } catch (_) {}
+      }
+    }
+    // Process anything left in buffer
+    if (buffer.startsWith('data: ')) {
+      try {
+        const evt = JSON.parse(buffer.slice(6));
+        if (evt.done && evt.text) {
+          const raw = evt.text.replace(/```json|```/g, '').trim();
+          report = JSON.parse(raw);
+        }
+      } catch (_) {}
+    }
+
+    if (!report) throw new Error('No response received from analysis');
     await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
