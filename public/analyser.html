@@ -825,15 +825,37 @@ Return this exact structure:
     } else {
       content = [{ type:'text', text:'No statements uploaded. Analyse based on merchant profile only.' + suffix }];
     }
-    const res = await fetch('/api/analyse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model:'claude-sonnet-4-5', max_tokens:4000, system, messages:[{ role:'user', content }] })
-    });
-    if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error ' + res.status); }
-
-    if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error ' + res.status); }
-    const apiData = await res.json();
+    // Attempt analysis with up to 3 retries for timeout errors
+    let apiData = null;
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log('Analysis attempt', attempt);
+        const res = await fetch('/api/analyse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model:'claude-sonnet-4-5', max_tokens:4000, system, messages:[{ role:'user', content }] })
+        });
+        if (res.status === 504 || res.status === 503) {
+          lastError = new Error('API timeout — retrying...');
+          console.warn('Attempt', attempt, 'timed out, retrying...');
+          continue;
+        }
+        if (!res.ok) {
+          const e = await res.json().catch(()=>({}));
+          throw new Error(e?.error?.message || e?.error || 'API error ' + res.status);
+        }
+        apiData = await res.json();
+        break;
+      } catch(e) {
+        lastError = e;
+        if (attempt < 3) {
+          console.warn('Attempt', attempt, 'failed:', e.message, '— retrying...');
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+    }
+    if (!apiData) throw lastError || new Error('Analysis failed after 3 attempts');
     const raw = (apiData.content.find(b => b.type==='text')?.text || '').replace(/```json|```/g,'').trim();
     if (!raw) throw new Error('No response received from analysis');
     const report = JSON.parse(raw);
