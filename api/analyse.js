@@ -1,6 +1,4 @@
 // api/analyse.js — streaming version
-// Pipes Anthropic's streaming response directly to the client,
-// so Vercel never waits for the full response before returning.
 
 export const config = {
   maxDuration: 60,
@@ -46,39 +44,38 @@ export default async function handler(req, res) {
       return res.status(anthropicRes.status).json({ error: 'Upstream API error', detail: errorText });
     }
 
-    // Stream the response straight through to the client
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
     const reader = anthropicRes.body.getReader();
     const decoder = new TextDecoder();
-
-    // Accumulate the full text so we can return it as a single JSON blob at the end
     let fullText = '';
+    let lineBuffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
+      lineBuffer += decoder.decode(value, { stream: true });
 
-      // Parse SSE lines from Anthropic
-      for (const line of chunk.split('\n')) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
+      // Process all complete lines
+      const lines = lineBuffer.split('\n');
+      lineBuffer = lines.pop(); // keep the last incomplete line
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data: ')) continue;
+        const data = trimmed.slice(6);
         if (data === '[DONE]') continue;
 
         try {
           const evt = JSON.parse(data);
+
           if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
             fullText += evt.delta.text;
-            // Send a keepalive ping so Vercel knows the connection is alive
+            // Send keepalive so Vercel sees activity
             res.write(': ping\n\n');
-          }
-          if (evt.type === 'message_stop') {
-            // Send the complete response as a final SSE event
-            res.write(`data: ${JSON.stringify({ done: true, text: fullText })}\n\n`);
           }
         } catch (_) {
           // ignore malformed lines
@@ -86,6 +83,20 @@ export default async function handler(req, res) {
       }
     }
 
+    // Process any remaining buffered line
+    if (lineBuffer.trim().startsWith('data: ')) {
+      const data = lineBuffer.trim().slice(6);
+      try {
+        const evt = JSON.parse(data);
+        if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+          fullText += evt.delta.text;
+        }
+      } catch (_) {}
+    }
+
+    // Always send the final event with the complete text
+    console.log('Stream complete. Text length:', fullText.length);
+    res.write(`data: ${JSON.stringify({ done: true, text: fullText })}\n\n`);
     res.end();
 
   } catch (err) {
@@ -93,6 +104,8 @@ export default async function handler(req, res) {
     if (!res.headersSent) {
       res.status(500).json({ error: 'Internal server error' });
     } else {
+      // Try to send the error through the stream
+      res.write(`data: ${JSON.stringify({ done: true, error: err.message })}\n\n`);
       res.end();
     }
   }
