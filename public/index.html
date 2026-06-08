@@ -746,32 +746,13 @@
   letter-spacing: 0.04em;
 }
 /* ── CYCLING HEADLINE ── */
-.cycler-wrap {
-  display: inline;
-  position: relative;
-}
-
 .cycler-word {
-  display: inline;
-  position: relative;
-  font-size: 1.25em;
   color: var(--blue-glow);
+  font-size: 1.25em;
   font-weight: 800;
   letter-spacing: -0.04em;
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.55s ease;
-  pointer-events: none;
   text-shadow: 0 0 40px rgba(58,138,255,0.4);
-}
-
-.cycler-word.active {
-  opacity: 1;
-}
-
-.cycler-word.active {
-  opacity: 1;
-  transform: translateY(0);
+  transition: opacity 0.4s ease;
 }
 
 </style>
@@ -831,18 +812,10 @@
 </section>
 
 <!-- OUTRO -->
-<section class="outro-section">
-  <h2 class="outro-headline">
-    Harness the power of AI to review your <span class="cycler-wrap">
-      <span class="cycler-word active">payments</span>
-      <span class="cycler-word">gateway</span>
-      <span class="cycler-word">acquirer</span>
-      <span class="cycler-word">PSP</span>
-      <span class="cycler-word">fraud tool</span>
-      <span class="cycler-word">risk</span>
-      <span class="cycler-word">routing</span>
-      <span class="cycler-word">reporting</span>
-      <span class="cycler-word">checkout</span>
+
+<h2 class="outro-headline">
+  The power of AI, designed to review your <span class="cycler-word" id="cyclerWord">payments</span>
+</h2>
     </span>
   </h2>
   <p class="outro-sub">Provide a short overview of your payments program. Our AI identifies where you are overpaying, every point where revenue is leaking, and every gap in your payments infrastructure - then an expert walks you through exactly what to fix and how to do it at no cost to you.</p>
@@ -1106,15 +1079,19 @@ requestCarouselUpdate();
 
 // ── Cycling headline ──────────────────────────────────────────────
 (function() {
-  const words = document.querySelectorAll('.cycler-word');
-  if (!words.length) return;
-  let current = 0;
+  const words = ['payments','gateway','acquirer','PSP','fraud tool','risk','routing','reporting','checkout'];
+  const el = document.getElementById('cyclerWord');
+  if (!el) return;
+  let i = 0;
   setInterval(function() {
-    words[current].classList.remove('active');
-    current = (current + 1) % words.length;
-    words[current].classList.add('active');
+    el.style.opacity = '0';
+    setTimeout(function() {
+      i = (i + 1) % words.length;
+      el.textContent = words[i];
+      el.style.opacity = '1';
+    }, 400);
   }, 2200);
-})(); 
+})();
  
 </script>
 </body>
