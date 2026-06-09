@@ -8,34 +8,78 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { submission, report, programContext } = req.body;
+    const { submission, report, programContext, files } = req.body;
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_ANON_KEY;
     const resendKey   = process.env.RESEND_API_KEY;
 
-    // ── Store in Supabase ─────────────────────────────────────────
+    // ── Upload files to Supabase Storage ─────────────────────────
+    const uploadedFiles = [];
+
+    if (files && files.length > 0) {
+      for (const file of files) {
+        try {
+          // file = { name, type, data (base64) }
+          const binaryData = Buffer.from(file.data, 'base64');
+          const timestamp  = Date.now();
+          const safeName   = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const path       = `${timestamp}_${safeName}`;
+
+          const uploadRes = await fetch(
+            `${supabaseUrl}/storage/v1/object/statements/${path}`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey':        supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type':  file.type || 'application/octet-stream',
+                'x-upsert':      'false',
+              },
+              body: binaryData,
+            }
+          );
+
+          if (uploadRes.ok) {
+            uploadedFiles.push({
+              name: file.name,
+              path,
+              type: file.type,
+              size: binaryData.length,
+            });
+          } else {
+            const err = await uploadRes.text();
+            console.error(`File upload failed for ${file.name}:`, err);
+          }
+        } catch (fileErr) {
+          console.error(`Error uploading ${file.name}:`, fileErr.message);
+        }
+      }
+    }
+
+    // ── Store submission in Supabase DB ───────────────────────────
     const dbRes = await fetch(`${supabaseUrl}/rest/v1/submissions`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseKey,
+        'Content-Type':  'application/json',
+        'apikey':        supabaseKey,
         'Authorization': `Bearer ${supabaseKey}`,
-        'Prefer': 'return=representation'
+        'Prefer':        'return=representation',
       },
       body: JSON.stringify({
-        submitted_at:   new Date().toISOString(),
-        provider:       report.provider      || null,
-        period:         report.period        || null,
-        volume:         report.volume        || null,
-        total_fees:     report.totalFees     || null,
-        effective_rate: report.effectiveRate || null,
-        pricing_model:  report.pricingModel  || null,
-        lcr_status:     report.lcrStatus     || null,
-        program_context: programContext      || null,
-        report_json:    JSON.stringify(report),
-        status:         'pending_review'
-      })
+        submitted_at:    new Date().toISOString(),
+        provider:        report.provider      || null,
+        period:          report.period        || null,
+        volume:          report.volume        || null,
+        total_fees:      report.totalFees     || null,
+        effective_rate:  report.effectiveRate || null,
+        pricing_model:   report.pricingModel  || null,
+        lcr_status:      report.lcrStatus     || null,
+        program_context: programContext       || null,
+        report_json:     JSON.stringify(report),
+        files_uploaded:  JSON.stringify(uploadedFiles),
+        status:          'pending_review',
+      }),
     });
 
     const dbData = await dbRes.json();
@@ -51,6 +95,18 @@ module.exports = async function handler(req, res) {
         <span style="font-size:13px;color:#444">${a.body}</span>
       </div>`
     ).join('');
+
+    // ── Files section for email ───────────────────────────────────
+    const filesHtml = uploadedFiles.length > 0
+      ? `<div style="margin-top:8px">
+          ${uploadedFiles.map(f =>
+            `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px">
+              <span style="color:#666">${f.name}</span>
+              <span style="color:#999;margin-left:auto">${(f.size/1024).toFixed(0)} KB</span>
+            </div>`
+          ).join('')}
+         </div>`
+      : '<p style="font-size:13px;color:#999">No files uploaded</p>';
 
     // ── Send email via Resend ─────────────────────────────────────
     const emailHtml = `<!DOCTYPE html>
@@ -82,6 +138,8 @@ tr:last-child td{border-bottom:none}
 .rec-steps{padding-left:18px;margin-top:8px}
 .rec-steps li{font-size:13px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:4px}
 .review-btn{display:inline-block;background:#1a5cff;color:white;text-decoration:none;padding:13px 26px;border-radius:8px;font-weight:600;font-size:14px}
+.file-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}
+.file-row:last-child{border-bottom:none}
 </style></head>
 <body><div class="wrap">
 <div class="hdr">
@@ -104,16 +162,16 @@ tr:last-child td{border-bottom:none}
       <tr><td>Effective rate</td><td>${fmtP(report.effectiveRate)}</td></tr>
       <tr><td>Pricing model</td><td>${report.pricingModel || '—'}</td></tr>
       <tr><td>LCR status</td><td>${report.lcrStatus || '—'}</td></tr>
-      ${report.perTransactionFee != null ? `<tr><td>Per-transaction fee</td><td>${report.perTransactionFee}¢</td></tr>` : ''}
-      ${report.monthlyFee != null ? `<tr><td>Monthly fee</td><td>${fmtD(report.monthlyFee)}</td></tr>` : ''}
     </table>
   </div>
   ${alertsHtml ? `<div class="section"><div class="sec-label">Key Findings</div>${alertsHtml}</div>` : ''}
-  ${programContext ? `<div class="section"><div class="sec-label">Program Description</div><div class="prog-box">${programContext.replace(/\n/g, '<br>')}</div></div>` : ''}
+  ${programContext ? `<div class="section"><div class="sec-label">Merchant Profile</div><div class="prog-box">${programContext.replace(/\n/g, '<br>')}</div></div>` : ''}
+  <div class="section">
+    <div class="sec-label">Uploaded Files (${uploadedFiles.length})</div>
+    ${filesHtml}
+    ${uploadedFiles.length > 0 ? `<p style="font-size:12px;color:#999;margin-top:10px">View files in Supabase Storage → statements bucket</p>` : ''}
+  </div>
   ${report.savingsOpportunity ? `<div class="section"><div class="sec-label">Savings Opportunity</div><div class="sec-text">${report.savingsOpportunity}</div></div>` : ''}
-  ${report.pricingModelAnalysis ? `<div class="section"><div class="sec-label">Pricing Model Analysis</div><div class="sec-text">${report.pricingModelAnalysis}</div></div>` : ''}
-  ${report.lcrAnalysis ? `<div class="section"><div class="sec-label">LCR Analysis</div><div class="sec-text">${report.lcrAnalysis}</div></div>` : ''}
-  ${report.benchmarkComment ? `<div class="section"><div class="sec-label">Market Benchmark</div><div class="sec-text">${report.benchmarkComment}</div></div>` : ''}
   ${report.keyRecommendation ? `
   <div class="section">
     <div class="rec-box">
@@ -123,7 +181,6 @@ tr:last-child td{border-bottom:none}
     </div>
   </div>` : ''}
   <div class="section" style="text-align:center;padding:24px 0">
-    <p style="font-size:14px;color:#666;margin-bottom:14px">View this submission in your dashboard</p>
     <a href="https://payswitch-eight.vercel.app/admin.html" class="review-btn">Open Dashboard →</a>
   </div>
 </div>
@@ -132,21 +189,21 @@ tr:last-child td{border-bottom:none}
     const emailRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${resendKey}`
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${resendKey}`,
       },
       body: JSON.stringify({
-        from: 'Payswitch Submissions <onboarding@resend.dev>',
-        to: ['declan.t.harrington@gmail.com'],
-        subject: `New submission — ${report.provider || 'Unknown'} · ${fmtP(report.effectiveRate)}`,
-        html: emailHtml
-      })
+        from:    'Payswitch Submissions <onboarding@resend.dev>',
+        to:      ['declan.t.harrington@gmail.com'],
+        subject: `New submission — ${report.provider || 'Unknown'} · ${fmtP(report.effectiveRate)} · ${uploadedFiles.length} file(s)`,
+        html:    emailHtml,
+      }),
     });
 
     const emailData = await emailRes.json();
     console.log('Email result:', JSON.stringify(emailData));
 
-    return res.status(200).json({ success: true, id: submissionId });
+    return res.status(200).json({ success: true, id: submissionId, filesUploaded: uploadedFiles.length });
 
   } catch (err) {
     console.error('Submit error:', err.message);
