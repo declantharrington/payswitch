@@ -650,8 +650,6 @@ input#fileInput { display: none; }
 </div>
 
 <script>
-const PSA_API_KEY = 'PASTE_YOUR_API_KEY_HERE';
-
 // ── State ─────────────────────────────────────────────────────────
 const data = {
   files: [], skippedUpload: false,
@@ -1012,15 +1010,12 @@ Return this exact structure:
       content = [{ type:'text', text:'No statements uploaded. Analyse based on merchant profile only.' + suffix }];
     }
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/analyse', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': PSA_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
       },
-      body: JSON.stringify({ model:'claude-sonnet-4-5', max_tokens:4000, system, messages:[{ role:'user', content }] })
+      body: JSON.stringify({ system, messages: [{ role: 'user', content }] })
     });
 
     if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error ' + res.status); }
