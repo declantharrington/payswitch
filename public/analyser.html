@@ -1054,7 +1054,11 @@ Return this exact structure:
 
     if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error ' + res.status); }
     const apiData = await res.json();
-    const raw = (apiData.content.find(b => b.type==='text')?.text || '').replace(/```json|```/g,'').trim();
+    const rawText = (apiData.content.find(b => b.type==='text')?.text || '');
+    const jsonStart = rawText.indexOf('{');
+    const jsonEnd = rawText.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON found in response');
+    const raw = rawText.slice(jsonStart, jsonEnd + 1);
     const report = JSON.parse(raw);
 
     // Post to submission pipeline (including files as base64)
