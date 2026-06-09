@@ -1,11 +1,11 @@
 {
   "functions": {
-    "api/analyse.js": {
-      "maxDuration": 60
-    },
     "api/submit.js": {
-      "maxDuration": 30
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/send-otp.js": {
+      "maxDuration": 10
     }
-  },
-  "regions": ["syd1"]
+  }
 }
