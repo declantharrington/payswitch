@@ -77,6 +77,7 @@ body { font-family: 'Inter', sans-serif; background: #0a0a0f; color: #f0f0f5; mi
 .status-badge.pending { background: rgba(200,150,12,0.15); color: #c8960c; }
 .status-badge.reviewed { background: rgba(10,122,82,0.15); color: #4de8a4; }
 .status-badge.sent { background: rgba(26,92,255,0.15); color: #6fa8ff; }
+.status-badge.approved { background: rgba(10,122,82,0.15); color: #4de8a4; }
 
 .rate-pill {
   display: inline-block; font-size: 12px; font-weight: 600;
@@ -158,6 +159,14 @@ body { font-family: 'Inter', sans-serif; background: #0a0a0f; color: #f0f0f5; mi
   font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s;
 }
 .btn-mark-reviewed:hover { background: rgba(10,122,82,0.25); }
+.btn-approve {
+  background: rgba(26,92,255,0.15); color: #6fa8ff; border: 1px solid rgba(26,92,255,0.3);
+  border-radius: 10px; padding: 10px 18px; font-family: 'Inter', sans-serif;
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s;
+  display: flex; align-items: center; gap: 7px;
+}
+.btn-approve:hover { background: rgba(26,92,255,0.25); }
+.btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-mark-sent {
   background: rgba(26,92,255,0.15); color: #6fa8ff; border: 1px solid rgba(26,92,255,0.3);
   border-radius: 10px; padding: 10px 18px; font-family: 'Inter', sans-serif;
@@ -213,6 +222,7 @@ body { font-family: 'Inter', sans-serif; background: #0a0a0f; color: #f0f0f5; mi
     <button class="filter-btn" onclick="filterSubmissions('pending_review',this)">Pending review</button>
     <button class="filter-btn" onclick="filterSubmissions('reviewed',this)">Reviewed</button>
     <button class="filter-btn" onclick="filterSubmissions('sent',this)">Sent to client</button>
+    <button class="filter-btn" onclick="filterSubmissions('approved',this)">Approved</button>
   </div>
 
   <div class="table-wrap">
@@ -299,8 +309,8 @@ function renderTable(submissions) {
   document.getElementById('submissions-list').innerHTML = submissions.map(s => {
     const date = new Date(s.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
     const rateClass = ratePillClass(s.effective_rate);
-    const statusMap = { pending_review:'pending', reviewed:'reviewed', sent:'sent' };
-    const statusLabel = { pending_review:'Pending review', reviewed:'Reviewed', sent:'Sent to client' };
+    const statusMap = { pending_review:'pending', reviewed:'reviewed', sent:'sent', approved:'approved' };
+    const statusLabel = { pending_review:'Pending review', reviewed:'Reviewed', sent:'Sent to client', approved:'Approved' };
     return `<div class="table-row" onclick="openSubmission('${s.id}')">
       <div class="table-cell primary">${s.provider||'Unknown'}<div class="table-cell muted" style="margin-top:2px">${s.period||'—'}</div></div>
       <div class="table-cell">${fmtD(s.volume)}</div>
@@ -364,8 +374,13 @@ function openSubmission(id) {
         <div class="modal-section-label">Update Status</div>
         <div class="modal-actions">
           <button class="btn-mark-reviewed" onclick="updateStatus('${s.id}','reviewed')">✓ Mark as reviewed</button>
+          <button class="btn-approve" id="btn-approve-${s.id}" onclick="approveAndGenerate('${s.id}')">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Approve & Generate Report
+          </button>
           <button class="btn-mark-sent" onclick="updateStatus('${s.id}','sent')">→ Mark as sent to client</button>
         </div>
+        <div id="report-status-${s.id}" style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.4)"></div>
       </div>
     </div>`;
 
@@ -390,6 +405,53 @@ async function updateStatus(id, status) {
   updateStats();
   renderTable(currentFilter === 'all' ? allSubmissions : allSubmissions.filter(s => s.status === currentFilter));
   closeModalBtn();
+}
+
+async function approveAndGenerate(id) {
+  const btn = document.getElementById('btn-approve-' + id);
+  const statusEl = document.getElementById('report-status-' + id);
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generating report...'; }
+  if (statusEl) statusEl.textContent = 'Claude is writing your personalised report...';
+
+  try {
+    const res = await fetch('/api/generate-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submissionId: id })
+    });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Generation failed');
+
+    // Update local status
+    const s = allSubmissions.find(x => x.id == id);
+    if (s) { s.status = 'approved'; s.report_html_path = data.htmlPath; }
+
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <span style="color:#4de8a4;font-weight:600">✓ Report generated</span>
+        <a href="${SUPABASE_URL}/storage/v1/object/public/statements/${data.htmlPath}"
+           target="_blank"
+           style="display:inline-flex;align-items:center;gap:6px;margin-left:12px;
+                  background:rgba(26,92,255,0.15);border:1px solid rgba(26,92,255,0.3);
+                  border-radius:8px;padding:6px 14px;color:#6fa8ff;font-size:12px;
+                  font-weight:500;text-decoration:none">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download report
+        </a>`;
+    }
+
+    updateStats();
+    renderTable(currentFilter === 'all' ? allSubmissions : allSubmissions.filter(s => s.status === currentFilter));
+
+  } catch (err) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:#ff8a80">Error: ${err.message}</span>`;
+    if (btn) { btn.disabled = false; btn.innerHTML = '✦ Approve & Generate Report'; }
+  }
 }
 
 function closeModal(e) { if (e.target === document.getElementById('modal-bg')) closeModalBtn(); }
