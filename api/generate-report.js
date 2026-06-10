@@ -51,20 +51,30 @@ module.exports = async function handler(req, res) {
 
 TONE: ${toneGuide}
 
-Write professional, specific prose — never generic. Reference the client's actual numbers, setup, and situation throughout. Return ONLY valid JSON, no markdown, no preamble.
+Write professional, specific prose — never generic. Reference the client's actual numbers, setup, and situation throughout.
+
+FORMATTING RULES — critical:
+- Use "\n\n" between paragraphs (double newline)
+- For sections with multiple points, use "**Heading:** Content" format with double newlines between each
+- Every section must have at least 2 paragraphs separated by \n\n
+- Never write a wall of text — break it up
+- Use specific subheadings within longer sections like "**Current Situation:**", "**The Problem:**", "**The Opportunity:**"
+- Per-transaction fees are in CENTS not dollars — state them correctly
+
+Return ONLY valid JSON, no markdown wrapping, no preamble.
 
 Return this exact structure:
 {
-  "executiveSummary": "3-4 paragraph professional narrative",
-  "pricingModelAnalysis": "2-3 paragraphs on pricing model suitability",
-  "savingsOpportunity": "2-3 paragraphs with quantified savings and maths",
-  "lcrAnalysis": "1-2 paragraphs on LCR status and dollar impact",
-  "benchmarkComment": "1-2 paragraphs comparing to market",
-  "stackAssessment": "2-3 paragraphs on their payments stack — name actual vendors, identify gaps",
-  "nextStep1": "First recommendation as a full sentence or two",
-  "nextStep2": "Second recommendation as a full sentence or two",
-  "nextStep3": "Third recommendation as a full sentence or two",
-  "keyRecommendation": "The single most important action — specific and direct"
+  "executiveSummary": "3-4 paragraphs separated by \n\n. First paragraph: what we found. Second: key issue. Third: the opportunity. Fourth: what happens next.",
+  "pricingModelAnalysis": "**Current Model:**\n\n[paragraph]\n\n**Why This Matters:**\n\n[paragraph]\n\n**The Alternative:**\n\n[paragraph]",
+  "savingsOpportunity": "**Identified Savings:**\n\n[paragraph with specific maths]\n\n**How We Get There:**\n\n[paragraph]\n\n**Conservative Estimate:**\n\n[paragraph]",
+  "lcrAnalysis": "**Current Status:**\n\n[paragraph]\n\n**Dollar Impact:**\n\n[paragraph]",
+  "benchmarkComment": "**Where You Sit:**\n\n[paragraph]\n\n**What Best-in-Class Looks Like:**\n\n[paragraph]",
+  "stackAssessment": "**Overall Assessment:**\n\n[paragraph]\n\n**What Is Working:**\n\n[paragraph]\n\n**Gaps and Risks:**\n\n[paragraph]",
+  "nextStep1": "Full recommendation sentence or two — specific and actionable",
+  "nextStep2": "Full recommendation sentence or two — specific and actionable",
+  "nextStep3": "Full recommendation sentence or two — specific and actionable",
+  "keyRecommendation": "The single most important action — direct and specific, one or two sentences"
 }`;
 
     const userMessage = `Write a personalised payments review for this merchant.
@@ -76,7 +86,11 @@ Card volume: ${fmtD(report.volume)}
 Total fees: ${fmtD(report.totalFees)}
 Effective rate: ${fmtP(report.effectiveRate)}
 Transactions: ${report.transactions || '—'}
-Per-transaction fee: ${report.perTransactionFee ? report.perTransactionFee + '¢' : '—'}
+Per-transaction fee (calculated as volume/transactions * effectiveRate): ${
+        report.volume && report.transactions && report.effectiveRate
+          ? fmtD((report.volume / report.transactions) * (report.effectiveRate / 100))
+          : report.perTransactionFee != null ? fmtD(report.perTransactionFee / 100) : '—'
+      } — this is a dollar value
 Monthly fee: ${fmtD(report.monthlyFee)}
 Terminal fees: ${fmtD(report.terminalFees)}
 Pricing model (AI assessed): ${report.pricingModel || '—'}
@@ -145,7 +159,21 @@ ${(report.alerts || []).map(a => `${a.type.toUpperCase()}: ${a.heading} — ${a.
       stackReplacements[`{{stack_item_${i+1}_status}}`] = statusLabel[item.status] || item.status;
     }
 
-    // ── 7. Build full replacement map ─────────────────────────────
+    // ── 7. Helper to convert narrative text to HTML ─────────────
+    function renderText(text) {
+      if (!text) return '';
+      return text
+        // Convert **heading:** to <strong>heading:</strong>
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        // Convert double newlines to paragraph breaks
+        .split('\n\n')
+        .map(p => p.trim())
+        .filter(p => p.length > 0)
+        .map(p => `<p style="margin-bottom:12px">${p}</p>`)
+        .join('');
+    }
+
+    // ── 8. Build full replacement map ─────────────────────────────
     const merchantName = programContext.match(/Name: (.+)/)?.[1]?.trim() || '—';
     const merchantEmail = programContext.match(/Email: (.+)/)?.[1]?.trim() || '—';
 
@@ -159,17 +187,26 @@ ${(report.alerts || []).map(a => `${a.type.toUpperCase()}: ${a.heading} — ${a.
       '{{merchant_email}}':       merchantEmail,
       '{{report_date}}':          today,
       '{{transactions}}':         report.transactions ? Number(report.transactions).toLocaleString('en-AU') : '—',
-      '{{per_transaction_fee}}':  report.perTransactionFee ? `${report.perTransactionFee}¢` : '—',
+      '{{per_transaction_fee}}':  (() => {
+        // Calculate: (volume / transactions) * (effectiveRate / 100)
+        if (report.volume && report.transactions && report.effectiveRate) {
+          const calc = (report.volume / report.transactions) * (report.effectiveRate / 100);
+          return fmtD(calc);
+        }
+        // Fallback to reported value if available
+        if (report.perTransactionFee != null) return fmtD(report.perTransactionFee / 100);
+        return '—';
+      })(),
       '{{monthly_fee}}':          fmtD(report.monthlyFee),
       '{{terminal_fees}}':        fmtD(report.terminalFees),
       '{{pricing_model}}':        report.pricingModel    || '—',
       '{{lcr_status}}':           report.lcrStatus       || '—',
-      '{{executive_summary}}':    narrative.executiveSummary    || '',
-      '{{pricing_model_analysis}}': narrative.pricingModelAnalysis || '',
-      '{{savings_opportunity}}':  narrative.savingsOpportunity  || '',
-      '{{lcr_analysis}}':         narrative.lcrAnalysis         || '',
-      '{{benchmark_comment}}':    narrative.benchmarkComment    || '',
-      '{{stack_assessment}}':     narrative.stackAssessment     || '',
+      '{{executive_summary}}':    renderText(narrative.executiveSummary    || ''),
+      '{{pricing_model_analysis}}': renderText(narrative.pricingModelAnalysis || ''),
+      '{{savings_opportunity}}':  renderText(narrative.savingsOpportunity  || ''),
+      '{{lcr_analysis}}':         renderText(narrative.lcrAnalysis         || ''),
+      '{{benchmark_comment}}':    renderText(narrative.benchmarkComment    || ''),
+      '{{stack_assessment}}':     renderText(narrative.stackAssessment     || ''),
       '{{next_step_1}}':          narrative.nextStep1           || '',
       '{{next_step_2}}':          narrative.nextStep2           || '',
       '{{next_step_3}}':          narrative.nextStep3           || '',
@@ -185,7 +222,9 @@ ${(report.alerts || []).map(a => `${a.type.toUpperCase()}: ${a.heading} — ${a.
 
     // ── 8. Store completed HTML in Supabase Storage ───────────────
     const timestamp = Date.now();
-    const htmlPath  = `reports/${submissionId}_${timestamp}.html`;
+    const safeName  = merchantName.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_').slice(0, 30);
+    const safeProvider = (report.provider || 'Unknown').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_').slice(0, 20);
+    const htmlPath  = `reports/${safeName}_${safeProvider}_${timestamp}.html`;
 
     await fetch(`${supabaseUrl}/storage/v1/object/statements/${htmlPath}`, {
       method: 'POST',
