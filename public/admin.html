@@ -174,14 +174,104 @@ body { font-family: 'Inter', sans-serif; background: #0a0a0f; color: #f0f0f5; mi
 }
 .btn-mark-sent:hover { background: rgba(26,92,255,0.25); }
 .program-box { background: rgba(255,255,255,0.04); border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.7; color: rgba(255,255,255,0.5); }
-
 .loading-spinner { text-align: center; padding: 60px 20px; color: rgba(255,255,255,0.3); font-size: 14px; }
+
+/* ── EDIT PANEL ── */
+.edit-panel-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: rgba(255,165,0,0.06); border: 1px solid rgba(255,165,0,0.18);
+  border-radius: 10px; padding: 11px 16px; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+  color: rgba(255,200,80,0.85); transition: background 0.15s; margin-bottom: 0;
+}
+.edit-panel-toggle:hover { background: rgba(255,165,0,0.1); }
+.edit-panel-toggle .toggle-icon {
+  margin-left: auto; font-size: 11px; transition: transform 0.2s;
+  color: rgba(255,200,80,0.5);
+}
+.edit-panel-toggle.open .toggle-icon { transform: rotate(180deg); }
+
+.edit-panel {
+  display: none; margin-top: 12px;
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px; padding: 20px; gap: 16px; flex-direction: column;
+}
+.edit-panel.open { display: flex; }
+
+.edit-field { display: flex; flex-direction: column; gap: 6px; }
+.edit-field-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+}
+.edit-field-hint {
+  font-size: 11px; color: rgba(255,255,255,0.2); margin-top: -3px; line-height: 1.5;
+}
+.edit-textarea {
+  font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.65;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px; color: rgba(255,255,255,0.75); padding: 10px 12px;
+  resize: vertical; min-height: 72px; transition: border-color 0.15s;
+}
+.edit-textarea:focus {
+  outline: none; border-color: rgba(26,92,255,0.4);
+  background: rgba(26,92,255,0.04);
+}
+.edit-textarea.tall { min-height: 110px; }
+
+.edit-input {
+  font-family: 'Inter', sans-serif; font-size: 13px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px; color: rgba(255,255,255,0.75); padding: 9px 12px;
+  transition: border-color 0.15s; width: 100%;
+}
+.edit-input:focus { outline: none; border-color: rgba(26,92,255,0.4); background: rgba(26,92,255,0.04); }
+
+.edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.edit-alerts-list { display: flex; flex-direction: column; gap: 8px; }
+.edit-alert-item {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+  position: relative;
+}
+.edit-alert-item-header { display: flex; align-items: center; gap: 8px; }
+.edit-alert-type-select {
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px; color: rgba(255,255,255,0.6); padding: 4px 8px; cursor: pointer;
+}
+.edit-alert-type-select:focus { outline: none; }
+.edit-alert-heading { font-family: 'Inter',sans-serif; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: rgba(255,255,255,0.75); padding: 5px 9px; flex: 1; }
+.edit-alert-heading:focus { outline: none; border-color: rgba(26,92,255,0.3); }
+.edit-alert-body { font-family: 'Inter',sans-serif; font-size: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: rgba(255,255,255,0.55); padding: 5px 9px; resize: vertical; min-height: 48px; line-height: 1.55; }
+.edit-alert-body:focus { outline: none; border-color: rgba(26,92,255,0.3); }
+.btn-remove-alert {
+  position: absolute; top: 8px; right: 8px;
+  background: none; border: none; color: rgba(255,255,255,0.2); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.btn-remove-alert:hover { color: #ff8a80; background: rgba(255,100,80,0.1); }
+.btn-add-alert {
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
+  background: none; border: 1px dashed rgba(255,255,255,0.12);
+  border-radius: 8px; color: rgba(255,255,255,0.3); padding: 8px 14px;
+  cursor: pointer; transition: all 0.15s; width: 100%;
+}
+.btn-add-alert:hover { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.55); }
+
+.edit-panel-note {
+  font-size: 11px; color: rgba(255,255,255,0.2); line-height: 1.6;
+  padding: 10px 12px; background: rgba(255,255,255,0.02);
+  border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);
+}
 
 @media (max-width: 900px) {
   .table-header, .table-row { grid-template-columns: 1fr 100px 100px 100px; }
   .table-header > *:nth-child(n+5),
   .table-row > *:nth-child(n+5) { display: none; }
   .stats-row { grid-template-columns: 1fr 1fr; }
+  .edit-row { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -323,6 +413,157 @@ function renderTable(submissions) {
   }).join('');
 }
 
+// ── EDIT PANEL ─────────────────────────────────────────────────────────────
+
+function toggleEditPanel(id) {
+  const toggle = document.getElementById('edit-toggle-' + id);
+  const panel  = document.getElementById('edit-panel-' + id);
+  toggle.classList.toggle('open');
+  panel.classList.toggle('open');
+}
+
+function addAlert(id) {
+  const list = document.getElementById('alerts-list-' + id);
+  const idx  = list.children.length;
+  const item = document.createElement('div');
+  item.className = 'edit-alert-item';
+  item.dataset.idx = idx;
+  item.innerHTML = `
+    <button class="btn-remove-alert" onclick="removeAlert(this)" title="Remove">✕</button>
+    <div class="edit-alert-item-header">
+      <select class="edit-alert-type-select">
+        <option value="warn">⚠ Warning</option>
+        <option value="good">✓ Positive</option>
+        <option value="info">ℹ Info</option>
+      </select>
+      <input class="edit-alert-heading" type="text" placeholder="Heading…" />
+    </div>
+    <textarea class="edit-alert-body" placeholder="Body text…" rows="2"></textarea>`;
+  list.appendChild(item);
+}
+
+function removeAlert(btn) {
+  btn.closest('.edit-alert-item').remove();
+}
+
+function readEditOverrides(id) {
+  const panel = document.getElementById('edit-panel-' + id);
+  if (!panel) return {};
+
+  const get = (sel) => {
+    const el = panel.querySelector(sel);
+    return el ? el.value.trim() : '';
+  };
+
+  // Read alerts
+  const alertItems = panel.querySelectorAll('.edit-alert-item');
+  const alerts = Array.from(alertItems).map(item => ({
+    type:    item.querySelector('.edit-alert-type-select')?.value || 'info',
+    heading: item.querySelector('.edit-alert-heading')?.value.trim() || '',
+    body:    item.querySelector('.edit-alert-body')?.value.trim() || '',
+  })).filter(a => a.heading);
+
+  return {
+    executiveSummary:     get('[data-field="executiveSummary"]'),
+    savingsOpportunity:   get('[data-field="savingsOpportunity"]'),
+    keyRecommendation:    get('[data-field="keyRecommendation"]'),
+    pricingModelAnalysis: get('[data-field="pricingModelAnalysis"]'),
+    lcrAnalysis:          get('[data-field="lcrAnalysis"]'),
+    benchmarkComment:     get('[data-field="benchmarkComment"]'),
+    adminNotes:           get('[data-field="adminNotes"]'),
+    alerts:               alerts.length ? alerts : null,
+  };
+}
+
+function buildAlertsEditorHtml(id, alerts) {
+  const itemsHtml = (alerts || []).map((a, i) => `
+    <div class="edit-alert-item" data-idx="${i}">
+      <button class="btn-remove-alert" onclick="removeAlert(this)" title="Remove">✕</button>
+      <div class="edit-alert-item-header">
+        <select class="edit-alert-type-select">
+          <option value="warn"  ${a.type==='warn'?'selected':''}>⚠ Warning</option>
+          <option value="good"  ${a.type==='good'?'selected':''}>✓ Positive</option>
+          <option value="info"  ${a.type==='info'?'selected':''}>ℹ Info</option>
+        </select>
+        <input class="edit-alert-heading" type="text" placeholder="Heading…" value="${(a.heading||'').replace(/"/g,'&quot;')}" />
+      </div>
+      <textarea class="edit-alert-body" placeholder="Body text…" rows="2">${a.body||''}</textarea>
+    </div>`).join('');
+
+  return `
+    <div class="edit-field">
+      <div class="edit-field-label">Key Findings / Alerts</div>
+      <div class="edit-field-hint">Edit, reorder, or remove AI-generated findings. These appear as coloured alert cards in the report.</div>
+      <div class="edit-alerts-list" id="alerts-list-${id}">${itemsHtml}</div>
+      <button class="btn-add-alert" onclick="addAlert('${id}')">+ Add finding</button>
+    </div>`;
+}
+
+function buildEditPanel(id, report) {
+  const r = report || {};
+  const val = (v) => (v || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  return `
+  <div class="modal-section" style="padding-top:20px">
+    <button class="edit-panel-toggle" id="edit-toggle-${id}" onclick="toggleEditPanel('${id}')">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Edit report content before generating
+      <span class="toggle-icon">▼</span>
+    </button>
+
+    <div class="edit-panel" id="edit-panel-${id}">
+
+      <div class="edit-field">
+        <div class="edit-field-label">Executive Summary</div>
+        <div class="edit-field-hint">2–4 sentence overview sent to the merchant. Tone should match their revenue band.</div>
+        <textarea class="edit-textarea tall" data-field="executiveSummary">${val(r.executiveSummary)}</textarea>
+      </div>
+
+      ${buildAlertsEditorHtml(id, r.alerts)}
+
+      <div class="edit-field">
+        <div class="edit-field-label">Savings Opportunity</div>
+        <div class="edit-field-hint">Quantified savings estimate and what's driving it.</div>
+        <textarea class="edit-textarea" data-field="savingsOpportunity">${val(r.savingsOpportunity)}</textarea>
+      </div>
+
+      <div class="edit-row">
+        <div class="edit-field">
+          <div class="edit-field-label">Pricing Model Analysis</div>
+          <textarea class="edit-textarea" data-field="pricingModelAnalysis">${val(r.pricingModelAnalysis)}</textarea>
+        </div>
+        <div class="edit-field">
+          <div class="edit-field-label">LCR Analysis</div>
+          <textarea class="edit-textarea" data-field="lcrAnalysis">${val(r.lcrAnalysis)}</textarea>
+        </div>
+      </div>
+
+      <div class="edit-field">
+        <div class="edit-field-label">Market Benchmark Comment</div>
+        <textarea class="edit-textarea" data-field="benchmarkComment">${val(r.benchmarkComment)}</textarea>
+      </div>
+
+      <div class="edit-field">
+        <div class="edit-field-label">Key Recommendation headline</div>
+        <div class="edit-field-hint">Short punchy headline that appears prominently in the recommendation box.</div>
+        <input class="edit-input" type="text" data-field="keyRecommendation" value="${val(r.keyRecommendation)}" placeholder="e.g. Switch to interchange-plus and save $8,400/year" />
+      </div>
+
+      <div class="edit-field">
+        <div class="edit-field-label">Admin notes (internal only)</div>
+        <div class="edit-field-hint">These are passed to Claude as extra context when generating the report but will NOT appear in the final document.</div>
+        <textarea class="edit-textarea" data-field="adminNotes" placeholder="e.g. Merchant is currently in contract with Square until March. Focus on post-contract savings. They mentioned being unhappy with support."></textarea>
+      </div>
+
+      <div class="edit-panel-note">
+        ✦ Any fields left blank will be generated fresh by Claude using the original statement data. Edited fields will be used as-is and incorporated into the final report.
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── MODAL ──────────────────────────────────────────────────────────────────
+
 function openSubmission(id) {
   const s = allSubmissions.find(x => x.id == id);
   if (!s) return;
@@ -370,6 +611,9 @@ function openSubmission(id) {
           ${report.nextSteps?.length ? `<ol class="modal-rec-steps">${report.nextSteps.map(s=>`<li>${s}</li>`).join('')}</ol>` : ''}
         </div>
       </div>` : ''}
+
+      ${buildEditPanel(s.id, report)}
+
       <div class="modal-section">
         <div class="modal-section-label">Update Status</div>
         <div class="modal-actions">
@@ -399,7 +643,6 @@ async function updateStatus(id, status) {
     },
     body: JSON.stringify({ status })
   });
-  // Update locally
   const s = allSubmissions.find(x => x.id == id);
   if (s) s.status = status;
   updateStats();
@@ -422,8 +665,12 @@ async function openReport(htmlPath) {
 }
 
 async function approveAndGenerate(id) {
-  const btn = document.getElementById('btn-approve-' + id);
+  const btn      = document.getElementById('btn-approve-' + id);
   const statusEl = document.getElementById('report-status-' + id);
+
+  // Collect any manual edits from the panel
+  const overrides = readEditOverrides(id);
+
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generating report...'; }
   if (statusEl) statusEl.textContent = 'Claude is writing your personalised report...';
 
@@ -431,19 +678,16 @@ async function approveAndGenerate(id) {
     const res = await fetch('/api/generate-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ submissionId: id })
+      body: JSON.stringify({ submissionId: id, overrides })
     });
     const data = await res.json();
 
     if (!res.ok) throw new Error(data.error || 'Generation failed');
 
-    // Update local status
     const s = allSubmissions.find(x => x.id == id);
     if (s) { s.status = 'approved'; s.report_html_path = data.htmlPath; }
 
     if (statusEl) {
-      // Fetch the HTML and open as a blob so it renders properly
-      const reportUrl = `${SUPABASE_URL}/storage/v1/object/public/statements/${data.htmlPath}`;
       statusEl.innerHTML = `
         <span style="color:#4de8a4;font-weight:600">✓ Report generated</span>
         <button onclick="openReport('${data.htmlPath}')"
@@ -477,7 +721,6 @@ function closeModalBtn() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
 
 loadSubmissions();
-// Refresh every 60 seconds
 setInterval(loadSubmissions, 60000);
 </script>
 </body>
