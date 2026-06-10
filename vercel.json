@@ -1,11 +1,19 @@
 {
   "functions": {
+    "api/analyse.js": {
+      "maxDuration": 120,
+      "memory": 1024
+    },
     "api/submit.js": {
       "maxDuration": 60,
       "memory": 1024
     },
     "api/send-otp.js": {
       "maxDuration": 10
+    },
+    "api/generate-report.js": {
+      "maxDuration": 120,
+      "memory": 1024
     }
   }
 }
