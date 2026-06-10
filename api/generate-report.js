@@ -1,0 +1,224 @@
+// api/generate-report.js
+// Triggered when admin approves a submission.
+// Fetches the HTML template, populates it with real merchant data, stores in Supabase.
+
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { submissionId } = req.body;
+  if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
+
+  const supabaseUrl  = process.env.SUPABASE_URL;
+  const supabaseKey  = process.env.SUPABASE_ANON_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+
+  try {
+    // ── 1. Fetch submission from Supabase ─────────────────────────
+    const fetchRes = await fetch(
+      `${supabaseUrl}/rest/v1/submissions?id=eq.${submissionId}&select=*`,
+      { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+    );
+    const rows = await fetchRes.json();
+    if (!rows.length) return res.status(404).json({ error: 'Submission not found' });
+
+    const submission    = rows[0];
+    const report        = JSON.parse(submission.report_json || '{}');
+    const programContext = submission.program_context || '';
+
+    // ── 2. Determine revenue band for tone calibration ────────────
+    const revenueBand = (() => {
+      if (programContext.includes('50mplus'))  return 'enterprise';
+      if (programContext.includes('20to50m') || programContext.includes('5to20m')) return 'mid-market';
+      return 'smb';
+    })();
+
+    const toneGuide = {
+      enterprise:    'Write for a CFO or Head of Finance. Use precise financial language, basis points, and regulatory context. Be direct and data-driven. No simplifications.',
+      'mid-market':  'Write for a business owner or finance manager. Balance technical accuracy with plain English. Use dollar amounts alongside percentages. Be specific about savings.',
+      smb:           'Write for a small business owner. Plain English only — no jargon. Lead with dollar impact. Keep it concise and actionable.'
+    }[revenueBand];
+
+    const fmtD = n => n != null ? `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+    const fmtP = n => n != null ? `${Number(n).toFixed(2)}%` : '—';
+    const today = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    // ── 3. Call Claude to write personalised narrative ────────────
+    const systemPrompt = `You are a senior payments consultant at PaySwitch, an Australian payments advisory firm writing a formal client-facing report.
+
+TONE: ${toneGuide}
+
+Write professional, specific prose — never generic. Reference the client's actual numbers, setup, and situation throughout. Return ONLY valid JSON, no markdown, no preamble.
+
+Return this exact structure:
+{
+  "executiveSummary": "3-4 paragraph professional narrative",
+  "pricingModelAnalysis": "2-3 paragraphs on pricing model suitability",
+  "savingsOpportunity": "2-3 paragraphs with quantified savings and maths",
+  "lcrAnalysis": "1-2 paragraphs on LCR status and dollar impact",
+  "benchmarkComment": "1-2 paragraphs comparing to market",
+  "stackAssessment": "2-3 paragraphs on their payments stack — name actual vendors, identify gaps",
+  "nextStep1": "First recommendation as a full sentence or two",
+  "nextStep2": "Second recommendation as a full sentence or two",
+  "nextStep3": "Third recommendation as a full sentence or two",
+  "keyRecommendation": "The single most important action — specific and direct"
+}`;
+
+    const userMessage = `Write a personalised payments review for this merchant.
+
+DATA FROM STATEMENT:
+Provider: ${report.provider || '—'}
+Period: ${report.period || '—'}
+Card volume: ${fmtD(report.volume)}
+Total fees: ${fmtD(report.totalFees)}
+Effective rate: ${fmtP(report.effectiveRate)}
+Transactions: ${report.transactions || '—'}
+Per-transaction fee: ${report.perTransactionFee ? report.perTransactionFee + '¢' : '—'}
+Monthly fee: ${fmtD(report.monthlyFee)}
+Terminal fees: ${fmtD(report.terminalFees)}
+Pricing model (AI assessed): ${report.pricingModel || '—'}
+LCR status (AI assessed): ${report.lcrStatus || '—'}
+
+AI FINDINGS:
+${report.executiveSummary || ''}
+${report.savingsOpportunity || ''}
+${report.lcrAnalysis || ''}
+${report.benchmarkComment || ''}
+${report.stackAssessment || ''}
+Key recommendation: ${report.keyRecommendation || ''}
+
+MERCHANT PROFILE:
+${programContext}
+
+KEY ALERTS:
+${(report.alerts || []).map(a => `${a.type.toUpperCase()}: ${a.heading} — ${a.body}`).join('\n')}`;
+
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 6000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }]
+      })
+    });
+
+    if (!claudeRes.ok) throw new Error(`Claude error: ${claudeRes.status}`);
+    const claudeData = await claudeRes.json();
+    const rawText    = claudeData.content.find(b => b.type === 'text')?.text || '';
+    const jsonStart  = rawText.indexOf('{');
+    const jsonEnd    = rawText.lastIndexOf('}');
+    const narrative  = JSON.parse(rawText.slice(jsonStart, jsonEnd + 1));
+
+    // ── 4. Fetch the HTML template from the repo ──────────────────
+    const templateRes = await fetch('https://raw.githubusercontent.com/declantharrington/payswitch/main/public/payswitch-report-template.html');
+    if (!templateRes.ok) throw new Error('Could not load report template');
+    let html = await templateRes.text();
+
+    // ── 5. Build alert HTML ───────────────────────────────────────
+    const alertTypes = ['warn', 'info', 'good'];
+    const alerts     = report.alerts || [];
+
+    const alertReplacements = {
+      '{{key_finding_1_heading}}': alerts[0]?.heading || '—',
+      '{{key_finding_1_body}}':    alerts[0]?.body    || '',
+      '{{key_finding_2_heading}}': alerts[1]?.heading || '—',
+      '{{key_finding_2_body}}':    alerts[1]?.body    || '',
+      '{{key_finding_3_heading}}': alerts[2]?.heading || '—',
+      '{{key_finding_3_body}}':    alerts[2]?.body    || '',
+    };
+
+    // ── 6. Build stack item replacements ─────────────────────────
+    const stackItems = report.stackItems || [];
+    const statusLabel = { ok: '✓ OK', warn: '⚠ Review', gap: '✗ Gap' };
+    const stackReplacements = {};
+    for (let i = 0; i < 5; i++) {
+      const item = stackItems[i] || { label: '—', value: '—', status: 'ok' };
+      stackReplacements[`{{stack_item_${i+1}_label}}`]  = item.label;
+      stackReplacements[`{{stack_item_${i+1}_value}}`]  = item.value;
+      stackReplacements[`{{stack_item_${i+1}_status}}`] = statusLabel[item.status] || item.status;
+    }
+
+    // ── 7. Build full replacement map ─────────────────────────────
+    const merchantName = programContext.match(/Name: (.+)/)?.[1]?.trim() || '—';
+    const merchantEmail = programContext.match(/Email: (.+)/)?.[1]?.trim() || '—';
+
+    const replacements = {
+      '{{provider}}':             report.provider        || '—',
+      '{{period}}':               report.period          || '—',
+      '{{effective_rate}}':       fmtP(report.effectiveRate),
+      '{{total_fees}}':           fmtD(report.totalFees),
+      '{{volume}}':               fmtD(report.volume),
+      '{{merchant_name}}':        merchantName,
+      '{{merchant_email}}':       merchantEmail,
+      '{{report_date}}':          today,
+      '{{transactions}}':         report.transactions ? Number(report.transactions).toLocaleString('en-AU') : '—',
+      '{{per_transaction_fee}}':  report.perTransactionFee ? `${report.perTransactionFee}¢` : '—',
+      '{{monthly_fee}}':          fmtD(report.monthlyFee),
+      '{{terminal_fees}}':        fmtD(report.terminalFees),
+      '{{pricing_model}}':        report.pricingModel    || '—',
+      '{{lcr_status}}':           report.lcrStatus       || '—',
+      '{{executive_summary}}':    narrative.executiveSummary    || '',
+      '{{pricing_model_analysis}}': narrative.pricingModelAnalysis || '',
+      '{{savings_opportunity}}':  narrative.savingsOpportunity  || '',
+      '{{lcr_analysis}}':         narrative.lcrAnalysis         || '',
+      '{{benchmark_comment}}':    narrative.benchmarkComment    || '',
+      '{{stack_assessment}}':     narrative.stackAssessment     || '',
+      '{{next_step_1}}':          narrative.nextStep1           || '',
+      '{{next_step_2}}':          narrative.nextStep2           || '',
+      '{{next_step_3}}':          narrative.nextStep3           || '',
+      '{{key_recommendation}}':   narrative.keyRecommendation   || '',
+      ...alertReplacements,
+      ...stackReplacements,
+    };
+
+    // Apply all replacements
+    for (const [key, value] of Object.entries(replacements)) {
+      html = html.split(key).join(value);
+    }
+
+    // ── 8. Store completed HTML in Supabase Storage ───────────────
+    const timestamp = Date.now();
+    const htmlPath  = `reports/${submissionId}_${timestamp}.html`;
+
+    await fetch(`${supabaseUrl}/storage/v1/object/statements/${htmlPath}`, {
+      method: 'POST',
+      headers: {
+        apikey:          supabaseKey,
+        Authorization:   `Bearer ${supabaseKey}`,
+        'Content-Type':  'text/html',
+        'x-upsert':      'true'
+      },
+      body: html
+    });
+
+    // ── 9. Update submission status ───────────────────────────────
+    await fetch(`${supabaseUrl}/rest/v1/submissions?id=eq.${submissionId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type':  'application/json',
+        apikey:          supabaseKey,
+        Authorization:   `Bearer ${supabaseKey}`
+      },
+      body: JSON.stringify({
+        status:           'approved',
+        report_narrative: JSON.stringify(narrative),
+        report_html_path: htmlPath
+      })
+    });
+
+    return res.status(200).json({ success: true, htmlPath });
+
+  } catch (err) {
+    console.error('generate-report error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
