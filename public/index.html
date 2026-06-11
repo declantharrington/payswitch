@@ -776,14 +776,14 @@
 .cycler-wrap {
   display: inline-block;
   position: relative;
-  width: 8.5ch;
-  height: 1.08em;
+  width: 7.5ch;
+  height: 1em;
   vertical-align: baseline;
 }
 
 .cycler-word {
   position: absolute;
-  left: 50%;
+  left: 0;
   top: 0;
   font-size: 1em;
   color: var(--blue-glow);
@@ -791,7 +791,7 @@
   letter-spacing: -0.055em;
   white-space: nowrap;
   opacity: 0;
-  transform: translate(-50%, 10px);
+  transform: translateY(10px);
   transition: opacity 0.55s ease, transform 0.55s ease;
   pointer-events: none;
   text-shadow:
@@ -801,7 +801,7 @@
 
 .cycler-word.active {
   opacity: 1;
-  transform: translate(-50%, 0);
+  transform: translateY(0);
 }
 }
 
