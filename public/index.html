@@ -231,101 +231,55 @@
 }
   
 
-  /* ── DEPTH CAROUSEL SECTION (REPLACES VIDEO) ── */
-  #scroll-section {
+  /* ── STATIC PRODUCT IMAGE SECTION ── */
+  .static-image-section {
     position: relative;
-    height: 3000px;
+    padding: clamp(80px, 10vh, 140px) 60px clamp(100px, 12vh, 160px);
     background: #000;
-  }
-
-  .sticky-container {
-    position: sticky;
-    top: 0;
-    height: 100vh;
-    width: 100%;
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
     overflow: hidden;
-    background: #000;
   }
 
-  .sticky-container::before {
+  .static-image-section::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse 70% 55% at 50% 50%, transparent 34%, rgba(0,0,0,0.82) 100%);
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 50%, rgba(26,107,255,0.10) 0%, transparent 52%),
+      radial-gradient(ellipse 90% 65% at 50% 50%, transparent 35%, rgba(0,0,0,0.84) 100%);
     pointer-events: none;
-    z-index: 11;
+    z-index: 1;
   }
 
-  .sticky-container::after {
+  .static-image-section::after {
     content: '';
     position: absolute;
     bottom: 0; left: 0; right: 0;
     height: 180px;
     background: linear-gradient(to bottom, transparent, var(--black));
     pointer-events: none;
-    z-index: 12;
+    z-index: 2;
   }
 
-  .carousel-scene {
-    width: 100vw;
-    height: 100vh;
+  .static-image-wrap {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    perspective: 1000px;
-    perspective-origin: 50% 50%;
-    z-index: 4;
-    background: #000;
-  }
-
-  .carousel-slide {
-    position: absolute;
-    width: min(860px, 84vw);
-    aspect-ratio: 16 / 9;
-    border-radius: 18px;
+    z-index: 3;
+    width: min(1040px, 88vw);
+    margin: 0 auto;
+    border-radius: 24px;
     overflow: visible;
-    will-change: transform, opacity, filter;
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.04),
-      0 40px 120px rgba(0,0,0,0.95);
-    transform-style: preserve-3d;
+    filter: drop-shadow(0 40px 120px rgba(0,0,0,0.9))
+            drop-shadow(0 0 80px rgba(26,107,255,0.10));
   }
 
-  .carousel-slide img {
+  .static-image-wrap img {
     width: 100%;
-    height: 100%;
-    object-fit: contain;
+    height: auto;
     display: block;
-    border-radius: 18px;
-    pointer-events: none;
     user-select: none;
-  }
-
-  .tunnel-ring {
-    display: none;
-  }
-
-  .carousel-dots,
-  .carousel-counter {
-    display: none !important;
-  }
-
-  .carousel-scroll-hint {
-    position: absolute;
-    bottom: 64px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 20;
-    color: rgba(255,255,255,0.2);
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
     pointer-events: none;
-    transition: opacity 0.8s;
   }
 
   /* ── AFTER-SCROLL SECTION ── */
@@ -671,31 +625,14 @@
     display: flex;
     align-items: center;
   }
-
-
-  /* Force the carousel canvas to pure black so the imagery blends into the page */
-  #scroll-section,
-  #scroll-section .sticky-container,
-  #scroll-section .carousel-scene {
-    background: #000 !important;
-  }
-
-  #scroll-section .tunnel-ring {
-    display: none !important;
-  }
-
-
-  @media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce) {
     .gradient-text { animation: none; font-size: 1.08em; }
   }
 
   @media (max-width: 768px) {
-    .carousel-slide {
-      width: min(92vw, 860px);
-      aspect-ratio: 16 / 9;
-    }
-
-    nav { padding: 16px 24px; }
+    .static-image-section { padding: 70px 24px 90px; }
+    .static-image-wrap { width: min(96vw, 760px); }
+nav { padding: 16px 24px; }
     .nav-links { display: none; }
     .hero-headline-wrap { padding: 120px 24px 40px; }
     h1 { font-size: 44px; }
@@ -785,8 +722,7 @@
   position: absolute;
   left: 0;
   top: 0;
- font-size: 1.15em;
-font-weight: 800;
+  font-size: 1.15em;
   color: var(--blue-glow);
   font-weight: 800;
   letter-spacing: -0.055em;
@@ -804,8 +740,6 @@ font-weight: 800;
   opacity: 1;
   transform: translateY(0);
 }
-}
-
 </style>
 </head>
 <body>
@@ -849,16 +783,10 @@ font-weight: 800;
   </a>
 </div>
  
-<!-- DEPTH CAROUSEL SECTION -->
-<section id="scroll-section">
-  <div class="sticky-container">
-    <div class="carousel-scene" id="carouselScene">
-      <div class="tunnel-ring" style="width:min(820px,92vw);height:calc(min(820px,92vw)*10/16);opacity:0.6;"></div>
-      <div class="tunnel-ring" style="width:min(900px,100vw);height:calc(min(900px,100vw)*10/16);opacity:0.3;"></div>
-      <div class="tunnel-ring" style="width:min(680px,76vw);height:calc(min(680px,76vw)*10/16);opacity:0.2;"></div>
-    </div>
-
-    <div class="carousel-scroll-hint" id="scrollHint">scroll to explore</div>
+<!-- STATIC PRODUCT IMAGE SECTION -->
+<section class="static-image-section">
+  <div class="static-image-wrap">
+    <img src="terminal-stack.png" alt="PaySwitch payment stack preview" id="terminalStackImage">
   </div>
 </section>
 
@@ -940,44 +868,13 @@ font-weight: 800;
 </footer>
 
 <script>
-// ─── DEPTH CAROUSEL SCROLL LOGIC ──────────────────────────────
-const images = [
-  "frames/carousel1.png",
-  "frames/carousel2.png",
-  "frames/carousel3.png",
-  "frames/carousel4.png",
-  "frames/carousel5.png",
-  "frames/carousel6.png"
-];
-
-const DEPTH = 1200;
-const FRICTION = 0.86;
-const MIN_VEL = 0.001;
-
-const scrollSection = document.getElementById('scroll-section');
-const scene = document.getElementById('carouselScene');
-const scrollHint = document.getElementById('scrollHint');
+// ── Loading screen ──────────────────────────────────────────────
 const loaderBar = document.getElementById('loaderBar');
 const loaderPct = document.getElementById('loaderPct');
 const loader = document.getElementById('loader');
+const terminalStackImage = document.getElementById('terminalStackImage');
 
-// Safety fallback: never leave visitors stuck on the loading screen.
-window.setTimeout(() => {
-  if (!loaderHidden && loader) loader.classList.add('hidden');
-}, 3000);
-
-let scrollPos = 0;
-let targetPos = 0;
-let velocity = 0;
-let rafId = null;
 let loaderHidden = false;
-let hintFaded = false;
-
-const maxPos = images.length - 1;
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
 
 function setLoaderProgress(percent, label = 'Loading experience') {
   const safePercent = Math.max(0, Math.min(100, Math.round(percent)));
@@ -994,157 +891,41 @@ function hideLoader() {
   }, 220);
 }
 
-function getScrollProgress() {
-  if (!scrollSection) return 0;
-  const rect = scrollSection.getBoundingClientRect();
-  const scrollableDistance = Math.max(1, scrollSection.offsetHeight - window.innerHeight);
-  return clamp(-rect.top / scrollableDistance, 0, 1);
-}
+// Safety fallback: never leave visitors stuck on the loading screen.
+window.setTimeout(hideLoader, 2200);
 
-function fadeHint() {
-  if (!hintFaded && scrollHint && getScrollProgress() > 0.02) {
-    hintFaded = true;
-    scrollHint.style.opacity = '0';
-  }
-}
+function preloadStaticImage() {
+  setLoaderProgress(25, 'Loading experience');
 
-const slides = images.map((src) => {
-  const el = document.createElement('div');
-  el.className = 'carousel-slide';
-
-  const img = document.createElement('img');
-  img.src = src;
-  img.draggable = false;
-
-  el.appendChild(img);
-  scene.appendChild(el);
-  return el;
-});
-
-
-function applyTransforms() {
-  const pos = scrollPos;
-
-  slides.forEach((el, i) => {
-    const local = i - pos;
-
-    /*
-      New scroll effect:
-      - the next image starts very small in the distance
-      - it grows into the foreground
-      - it reaches a peak size
-      - it then shrinks and fades away
-      - the next image repeats the sequence
-    */
-
-    if (local > 1 || local < -1) {
-      el.style.opacity = '0';
-      el.style.pointerEvents = 'none';
-      el.style.zIndex = '1';
-      el.style.filter = 'blur(6px)';
-      el.style.transform = 'translateZ(-1200px) scale(0.06)';
-      return;
-    }
-
-    let scale;
-    let opacity;
-    let z;
-    let blur;
-
-    if (local >= 0) {
-      // Upcoming slide: tiny → large
-      const p = 1 - local;
-      scale = 0.06 + (p * 1.14);
-      opacity = clamp(p * 1.35, 0, 1);
-      z = -1200 + (p * 1200);
-      blur = 6 - (p * 6);
-    } else {
-      // Current slide: large → tiny
-      const p = Math.abs(local);
-      scale = 1.2 - (p * 1.14);
-      opacity = clamp(1 - (p * 1.25), 0, 1);
-      z = 0 - (p * 1200);
-      blur = p * 6;
-    }
-
-    el.style.opacity = String(opacity);
-    el.style.zIndex = String(Math.round(100 - Math.abs(local) * 50));
-    el.style.pointerEvents = opacity > 0.1 ? 'auto' : 'none';
-    el.style.filter = `blur(${blur}px)`;
-    el.style.transform = `translateZ(${z}px) scale(${scale})`;
-  });
-}
-
-function tick() {
-  const diff = targetPos - scrollPos;
-  velocity = velocity * FRICTION + diff * 0.12;
-
-  if (Math.abs(velocity) < MIN_VEL && Math.abs(diff) < 0.001) {
-    scrollPos = targetPos;
-    applyTransforms();
-    rafId = null;
+  if (!terminalStackImage) {
+    hideLoader();
     return;
   }
 
-  scrollPos = clamp(scrollPos + velocity, 0, maxPos);
-  applyTransforms();
-  rafId = requestAnimationFrame(tick);
-}
-
-function requestCarouselUpdate() {
-  targetPos = getScrollProgress() * maxPos;
-  fadeHint();
-  if (!rafId) rafId = requestAnimationFrame(tick);
-}
-
-function preloadCarouselImages() {
-  setLoaderProgress(15, 'Loading carousel');
-
-  let loaded = 0;
-  const total = images.length;
-
-  images.forEach((src) => {
-    const img = new Image();
-    img.onload = img.onerror = () => {
-      loaded += 1;
-      setLoaderProgress(15 + (loaded / total) * 75, 'Loading carousel');
-      if (loaded === total) hideLoader();
-    };
-    img.src = src;
-  });
-
-  setTimeout(hideLoader, 1800);
-}
-
-window.addEventListener('scroll', requestCarouselUpdate, { passive: true });
-window.addEventListener('resize', requestCarouselUpdate, { passive: true });
-window.addEventListener('orientationchange', requestCarouselUpdate, { passive: true });
-
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-    window.scrollBy({ top: 420, behavior: 'smooth' });
+  if (terminalStackImage.complete) {
+    hideLoader();
+    return;
   }
-  if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-    window.scrollBy({ top: -420, behavior: 'smooth' });
-  }
-});
 
-applyTransforms();
-preloadCarouselImages();
-requestCarouselUpdate();
+  terminalStackImage.onload = hideLoader;
+  terminalStackImage.onerror = hideLoader;
+}
+
+preloadStaticImage();
 
 // ── Cycling headline ──────────────────────────────────────────────
 (function() {
   const words = document.querySelectorAll('.cycler-word');
   if (!words.length) return;
+
   let current = 0;
+
   setInterval(function() {
     words[current].classList.remove('active');
     current = (current + 1) % words.length;
     words[current].classList.add('active');
   }, 2200);
-})(); 
- 
+})();
 </script>
 </body>
 </html>
