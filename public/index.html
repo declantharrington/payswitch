@@ -774,32 +774,29 @@
 }
 /* ── CYCLING HEADLINE ── */
 .cycler-wrap {
+  display: inline-block;
   position: relative;
-  width: 460px;
-  max-width: 100%;
+  width: 8.5ch;
   height: 1.08em;
-  margin: 0.05em auto 0;
+  vertical-align: baseline;
 }
 
 .cycler-word {
   position: absolute;
   left: 50%;
   top: 0;
-  font-size: 1.06em;
+  font-size: 1em;
   color: var(--blue-glow);
   font-weight: 800;
   letter-spacing: -0.055em;
   white-space: nowrap;
   opacity: 0;
-  transform: translateX(-50%);
+  transform: translate(-50%, 10px);
   transition: opacity 0.55s ease, transform 0.55s ease;
   pointer-events: none;
   text-shadow:
     0 0 42px rgba(58,138,255,0.36),
     0 22px 0 rgba(26,107,255,0.12);
-}
-.cycler-word {
-  transform: translate(-50%, 10px);
 }
 
 .cycler-word.active {
@@ -865,20 +862,20 @@
 </section>
 
 <!-- OUTRO -->
-<section class="outro-section">
-  <h2 class="outro-headline">
-    Harness the power of AI to review your <span class="cycler-wrap">
-      <span class="cycler-word active">payments</span>
-      <span class="cycler-word">gateway</span>
-      <span class="cycler-word">acquirer</span>
-      <span class="cycler-word">PSP</span>
-      <span class="cycler-word">fraud tool</span>
-      <span class="cycler-word">risk</span>
-      <span class="cycler-word">routing</span>
-      <span class="cycler-word">reporting</span>
-      <span class="cycler-word">checkout</span>
-    </span>
-  </h2>
+<h2 class="outro-headline">
+  Harness the power of AI to review your
+  <span class="cycler-wrap">
+    <span class="cycler-word active">payments</span>
+    <span class="cycler-word">gateway</span>
+    <span class="cycler-word">acquirer</span>
+    <span class="cycler-word">PSP</span>
+    <span class="cycler-word">fraud tool</span>
+    <span class="cycler-word">risk</span>
+    <span class="cycler-word">routing</span>
+    <span class="cycler-word">reporting</span>
+    <span class="cycler-word">checkout</span>
+  </span>
+</h2>
   <a href="/analyser.html" class="hero-cta-btn">
     Start for free
     <span class="cta-arrow"></span>
