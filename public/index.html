@@ -1346,6 +1346,15 @@ h3,
 [data-scrub="pin"] { --p: 0; }
 .scene-report { height: 300vh; }   /* scene 4's scroll runway */
 
+/* gallery override: must beat the generic .pin .pin-inner rule */
+.pin.scene-gallery .pin-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 70px 0 30px;
+}
+ 
 </style>
 </head>
 <body>
