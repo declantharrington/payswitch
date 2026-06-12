@@ -810,6 +810,21 @@ nav { padding: 16px 24px; }
 .phone-rep p{font-size:10px;color:var(--mut2)}
 .phone-rep .hr{height:1px;background:var(--line2);margin:4px 0}
 
+ .report-visual .phone.img-phone {
+  width: 260px;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.report-visual .phone.img-phone img {
+  width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;
+}
+
 
 /* ─────────────────────────────────────────────────────────────
    SCENE 5 — HORIZONTAL PRODUCT GALLERY
@@ -1493,23 +1508,9 @@ h3,
           <div class="base" aria-hidden="true"></div>
         </div>
 
-        <div class="phone shot">
-          <img class="drop" src="/images/mobile-report.png" alt="PaySwitch report cover on mobile" onerror="this.remove()" style="border-radius:26px">
-          <div class="screen">
-            <span class="notch" aria-hidden="true"></span>
-            <div class="phone-rep">
-              <span class="mk" aria-hidden="true"></span>
-              <div><h6>Payments<br>Assessment</h6><p style="margin-top:6px">Northbeam Retail Group<br>June 2026 · 22 pages</p></div>
-              <div class="hr"></div>
-              <div class="mini-row"><span>Est. annual savings</span><b>$312,400</b></div>
-              <div class="mini-row"><span>Effective rate</span><b>1.42%</b></div>
-              <div class="mini-row"><span>LCR opportunity</span><b>$86K/yr</b></div>
-              <div class="mini-row"><span>Acceptance uplift</span><b>+1.8%</b></div>
-              <div class="mini-row" style="border:none"><span>Priority actions</span><b>4</b></div>
-            </div>
-          </div>
-        </div>
-      </div>
+<div class="phone img-phone">
+  <img src="/public/payments-assessment-iphone.png" alt="Payments assessment on iPhone">
+</div>
 
       <div class="report-copy">
         <h2 class="scene-h">A consulting-grade review. Generated in minutes.</h2>
