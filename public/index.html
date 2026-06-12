@@ -27,6 +27,8 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     overflow-x: hidden;
     cursor: default;
+     -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   }
 
   /* ── LOADING SCREEN ── */
@@ -1211,9 +1213,9 @@ h3,
   margin: 0 0 36px;
 }
 
-.hero-sub b {
-  color: #ffffff;
-  font-weight: 600;
+.hero-sub b, .hero-sub strong {
+  font-weight: 500;
+  color: var(--text-primary);
 }
 /* CTA sizing */
 .hero-cta-btn {
