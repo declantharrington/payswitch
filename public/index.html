@@ -625,6 +625,23 @@
     display: flex;
     align-items: center;
   }
+
+@media (max-width: 860px) {
+  .scene-report { height: auto !important; padding: 90px 20px 60px; margin-top: 10px; }
+  .scene-report .pin-inner { position: relative; min-height: auto; padding: 0; overflow: visible; }
+  .report-stage { grid-template-columns: 1fr; gap: 44px; }
+  .report-visual { min-height: 0; padding-bottom: 110px; }
+  .report-visual .phone { right: 0; bottom: -30px; width: 182px; }
+  .fan { display: none; }
+  .rep-screen { grid-template-columns: 1fr; }
+  .report-copy { order: -1; }
+  .report-copy .scene-h { max-width: 12ch; }
+}
+@media (max-width: 520px) {
+  .scene-report { padding-left: 16px; padding-right: 16px; }
+  .report-visual .phone { width: 158px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .gradient-text { animation: none; font-size: 1.08em; }
   }
@@ -740,6 +757,125 @@ nav { padding: 16px 24px; }
   opacity: 1;
   transform: translateY(0);
 }
+
+
+
+/* ---- Scene 4 shared layout/device helpers ---- */
+.wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
+}
+.scene-h {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  font-size: clamp(34px, 4.4vw, 64px);
+  max-width: 15ch;
+  color: white;
+}
+.scene-sub {
+  margin-top: 18px;
+  font-size: clamp(16px, 1.4vw, 19px);
+  color: var(--mut);
+  max-width: 44ch;
+  line-height: 1.65;
+}
+.macbook { position: relative; }
+.macbook .lid {
+  border-radius: 16px 16px 0 0;
+  border: 1px solid rgba(140,172,255,.18);
+  border-bottom: none;
+  background: #05080f;
+  padding: 10px 10px 0;
+  box-shadow: 0 40px 110px rgba(0,2,10,.85),0 0 90px rgba(26,107,255,.14);
+}
+.macbook .lid .screen {
+  border-radius: 9px 9px 0 0;
+  overflow: hidden;
+  background: #04070e;
+  position: relative;
+}
+.macbook .base {
+  height: 14px;
+  border-radius: 0 0 16px 16px;
+  background: linear-gradient(#101a2e,#070b14);
+  border: 1px solid rgba(140,172,255,.16);
+  border-top: 1px solid rgba(160,190,255,.25);
+  position: relative;
+}
+.macbook .base::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 7px;
+  border-radius: 0 0 9px 9px;
+  background: rgba(2,4,8,.7);
+}
+.skel {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(126,160,255,.12);
+}
+
+/* ============ SCENE 4 — REPORT ============ */
+.scene-report{height:300vh;z-index:3}
+.report-stage{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:clamp(24px,4vw,64px);align-items:center}
+.report-copy .scene-h,.report-copy .scene-sub{
+  opacity:calc(clamp(0,(var(--p) - .05) * 5,1));
+  transform:translateY(calc((1 - clamp(0,(var(--p) - .05) * 5,1)) * 40px))}
+.report-visual{position:relative;min-height:580px}
+.report-visual .macbook{width:min(560px,100%);position:relative;z-index:3;
+  opacity:calc(clamp(0,(var(--p) - .04) * 5,1));
+  transform:translateY(calc((1 - clamp(0,(var(--p) - .04) * 5,1)) * 70px)) scale(calc(.96 + clamp(0,(var(--p) - .04)*5,1) * .04))}
+.report-visual .phone{position:absolute;right:-26px;bottom:-60px;z-index:6;
+  --t:clamp(0, calc((var(--p) - .3) * 4), 1);
+  opacity:var(--t);transform:translateY(calc((1 - var(--t)) * 90px)) rotate(calc(4deg + (1 - var(--t)) * 6deg))}
+/* fanned PDF pages */
+.fan{position:absolute;left:-58px;top:-50px;z-index:2;width:170px}
+.fan .page{position:absolute;width:160px;aspect-ratio:1/1.34;border-radius:10px;background:linear-gradient(170deg,#101b32,#080d1a);
+  border:1px solid rgba(140,172,255,.22);box-shadow:0 20px 60px rgba(0,2,10,.7);padding:13px;
+  --t:clamp(0, calc((var(--p) - var(--d)) * 4), 1);opacity:var(--t)}
+.fan .page:nth-child(1){transform:rotate(calc(var(--t) * -14deg)) translateX(calc(var(--t) * -26px))}
+.fan .page:nth-child(2){transform:rotate(calc(var(--t) * -5deg)) translateY(calc(var(--t) * -10px))}
+.fan .page:nth-child(3){transform:rotate(calc(var(--t) * 6deg)) translateX(calc(var(--t) * 22px))}
+.fan .skel{margin-bottom:7px}
+.fan .skel.t{width:62%;height:9px;background:rgba(156,192,255,.3)}
+.fan .bars{display:flex;align-items:flex-end;gap:5px;height:46px;margin-top:12px}
+.fan .bars i{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--blue-glow),#0d4ed1);opacity:.85}
+/* report screen content */
+.rep-screen{padding:16px 18px;font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:300px}
+.rep-screen .full{grid-column:1/-1}
+.rep-head{display:flex;justify-content:space-between;align-items:center}
+.rep-head h6{font-family:var(--display);font-weight:800;font-size:13px;letter-spacing:-.01em}
+.rep-head p{color:var(--mut2);font-size:10px;margin-top:2px}
+.save-card{background:linear-gradient(150deg,rgba(26,107,255,.22),rgba(26,107,255,.05));border:1px solid rgba(80,140,255,.4);border-radius:12px;padding:13px 14px;box-shadow:0 0 36px rgba(26,107,255,.18)}
+.save-card .lbl{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#9cc0ff}
+.save-card .num{font-family:var(--display);font-weight:800;font-size:clamp(24px,2.2vw,30px);letter-spacing:-.03em;color:#dceaff;margin-top:4px;font-variant-numeric:tabular-nums}
+.save-card .per{font-size:10px;color:var(--mut);margin-top:2px}
+.bench{display:grid;gap:7px}
+.bench .row{display:grid;grid-template-columns:74px 1fr;gap:8px;align-items:center;font-size:9.5px;color:var(--mut)}
+.bench .track{height:6px;border-radius:3px;background:rgba(126,160,255,.08);position:relative;overflow:visible}
+.bench .fill{position:absolute;inset:0 auto 0 0;border-radius:3px;background:rgba(126,160,255,.3);width:var(--w)}
+.bench .row.you .fill{background:linear-gradient(90deg,#0d4ed1,var(--blue-glow));box-shadow:0 0 10px rgba(58,138,255,.55)}
+.bench .mark{position:absolute;top:-3px;bottom:-3px;width:1.5px;background:#ffd28f;left:58%}
+.recs{display:grid;gap:8px}
+.rec{--t:clamp(0, calc((var(--p) - var(--d)) * 5), 1);
+  display:flex;gap:10px;align-items:center;background:rgba(126,160,255,.05);border:1px solid var(--line);border-radius:11px;padding:9px 12px;font-size:11.5px;color:var(--mut);
+  opacity:var(--t);transform:translateX(calc((1 - var(--t)) * 36px))}
+.rec b{color:var(--ink);font-weight:600}
+.rec .n{width:20px;height:20px;flex:0 0 auto;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:600;color:#bcd6ff;background:rgba(26,107,255,.16);border:1px solid rgba(80,140,255,.3)}
+.phone-rep{padding:26px 16px 16px;display:grid;gap:12px;height:100%;align-content:start;background:
+  radial-gradient(120% 70% at 50% -10%,rgba(26,107,255,.35),transparent 60%),#04070e}
+.phone-rep .mk{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,var(--blue),#0a3fa8);box-shadow:0 0 18px rgba(26,107,255,.6)}
+.phone-rep h6{font-family:var(--display);font-weight:800;font-size:15px;line-height:1.2;letter-spacing:-.02em}
+.phone-rep p{font-size:10px;color:var(--mut2)}
+.phone-rep .hr{height:1px;background:var(--line2);margin:4px 0}
 
 
 /* ─────────────────────────────────────────────────────────────
@@ -1203,6 +1339,77 @@ nav { padding: 16px 24px; }
   </div>
 </section>
 
+<!-- ================= SCENE 4 · REPORT GENERATION ================= -->
+<section class="scene pin scene-report" data-scrub="pin" aria-label="Report generation">
+  <div class="pin-inner">
+    <div class="wrap report-stage">
+      <div class="report-visual">
+        <div class="fan" aria-hidden="true">
+          <div class="page" style="--d:.1"><div class="skel t"></div><div class="skel" style="width:88%"></div><div class="skel" style="width:74%"></div><div class="bars"><i style="height:40%"></i><i style="height:68%"></i><i style="height:52%"></i><i style="height:90%"></i><i style="height:62%"></i></div></div>
+          <div class="page" style="--d:.18"><div class="skel t"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:64%"></div><div class="bars"><i style="height:74%"></i><i style="height:48%"></i><i style="height:86%"></i><i style="height:58%"></i><i style="height:38%"></i></div></div>
+          <div class="page" style="--d:.26"><div class="skel t"></div><div class="skel" style="width:84%"></div><div class="skel" style="width:70%"></div><div class="bars"><i style="height:56%"></i><i style="height:82%"></i><i style="height:44%"></i><i style="height:70%"></i><i style="height:94%"></i></div></div>
+        </div>
+
+        <div class="macbook shot">
+          <img class="drop" src="/images/assessment-report.png" alt="PaySwitch payments assessment report" onerror="this.remove()" style="border-radius:16px">
+          <div class="lid"><div class="screen">
+            <div class="rep-screen">
+              <div class="full rep-head">
+                <div><h6>Payments Assessment — Executive Summary</h6><p>Northbeam Retail Group · Prepared by PaySwitch AI · June 2026</p></div>
+                <span class="tag">Confidential</span>
+              </div>
+              <div class="save-card">
+                <div class="lbl">Estimated annual savings</div>
+                <div class="num"><span data-count="312400" data-prefix="$">$0</span></div>
+                <div class="per">across pricing, routing &amp; acceptance</div>
+              </div>
+              <div class="dcard">
+                <h5>Provider benchmark <span style="color:#ffd28f">▎market median</span></h5>
+                <div class="bench">
+                  <div class="row you"><span>You (blended)</span><span class="track"><span class="fill" style="--w:78%"></span><span class="mark"></span></span></div>
+                  <div class="row"><span>Provider B</span><span class="track"><span class="fill" style="--w:60%"></span><span class="mark"></span></span></div>
+                  <div class="row"><span>Provider C</span><span class="track"><span class="fill" style="--w:52%"></span><span class="mark"></span></span></div>
+                  <div class="row"><span>IC+ modelled</span><span class="track"><span class="fill" style="--w:44%"></span><span class="mark"></span></span></div>
+                </div>
+              </div>
+              <div class="full recs">
+                <div class="rec" style="--d:.34"><span class="n">1</span><span><b>Enable least-cost routing</b> — eligible dual-network debit, est. $86K/yr</span></div>
+                <div class="rec" style="--d:.42"><span class="n">2</span><span><b>Move to interchange-plus pricing</b> — recover acquirer margin, est. $112K/yr</span></div>
+                <div class="rec" style="--d:.5"><span class="n">3</span><span><b>Renegotiate Amex</b> — 0.41% above benchmark on retail volume</span></div>
+                <div class="rec" style="--d:.58"><span class="n">4</span><span><b>Tune fraud rules &amp; retries</b> — recover ~1.8% approval rate</span></div>
+              </div>
+            </div>
+          </div></div>
+          <div class="base" aria-hidden="true"></div>
+        </div>
+
+        <div class="phone shot">
+          <img class="drop" src="/images/mobile-report.png" alt="PaySwitch report cover on mobile" onerror="this.remove()" style="border-radius:26px">
+          <div class="screen">
+            <span class="notch" aria-hidden="true"></span>
+            <div class="phone-rep">
+              <span class="mk" aria-hidden="true"></span>
+              <div><h6>Payments<br>Assessment</h6><p style="margin-top:6px">Northbeam Retail Group<br>June 2026 · 22 pages</p></div>
+              <div class="hr"></div>
+              <div class="mini-row"><span>Est. annual savings</span><b>$312,400</b></div>
+              <div class="mini-row"><span>Effective rate</span><b>1.42%</b></div>
+              <div class="mini-row"><span>LCR opportunity</span><b>$86K/yr</b></div>
+              <div class="mini-row"><span>Acceptance uplift</span><b>+1.8%</b></div>
+              <div class="mini-row" style="border:none"><span>Priority actions</span><b>4</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-copy">
+        <h2 class="scene-h">A consulting-grade review. Generated in minutes.</h2>
+        <p class="scene-sub">From messy statements to clear actions — executive summary, pricing review, provider benchmark, routing opportunity, acceptance analysis, fraud observations, next steps.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
 <!-- ================= SCENE 5 · HORIZONTAL GALLERY ================= -->
 <section class="scene pin scene-gallery" data-scrub="pin" data-gallery aria-label="Product gallery">
   <div class="pin-inner">
@@ -1397,6 +1604,75 @@ preloadStaticImage();
   }, 2200);
 })();
 
+
+
+// ── Scene 4 scroll progress + savings counter ─────────────────────
+(function() {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const scrubScenes = Array.from(document.querySelectorAll('[data-scrub]')).filter(el => !el.hasAttribute('data-gallery'));
+  if (!scrubScenes.length) return;
+
+  let ticking = false;
+  function clamp01(value) { return value < 0 ? 0 : value > 1 ? 1 : value; }
+
+  function updateScrubScenes() {
+    ticking = false;
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    scrubScenes.forEach(function(el) {
+      const rect = el.getBoundingClientRect();
+      let progress;
+      if (el.dataset.scrub === 'pin') {
+        progress = clamp01(-rect.top / Math.max(1, rect.height - vh));
+      } else {
+        progress = clamp01((vh - rect.top) / Math.max(1, vh + rect.height));
+      }
+      el.style.setProperty('--p', progress.toFixed(4));
+    });
+  }
+
+  function requestScrubUpdate() {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(updateScrubScenes);
+    }
+  }
+
+  if (reduceMotion) {
+    scrubScenes.forEach(el => el.style.setProperty('--p', '1'));
+  } else {
+    updateScrubScenes();
+    window.addEventListener('scroll', requestScrubUpdate, { passive: true });
+    window.addEventListener('resize', updateScrubScenes, { passive: true });
+    window.addEventListener('load', updateScrubScenes);
+  }
+
+  document.querySelectorAll('[data-count]').forEach(function(el) {
+    const target = parseInt(el.dataset.count, 10) || 0;
+    const prefix = el.dataset.prefix || '';
+    function format(n) { return prefix + n.toLocaleString('en-US'); }
+
+    if (reduceMotion) {
+      el.textContent = format(target);
+      return;
+    }
+
+    const observer = new IntersectionObserver(function(entries, obs) {
+      if (!entries[0].isIntersecting) return;
+      obs.disconnect();
+      const start = performance.now();
+      const duration = 1600;
+      function step(now) {
+        const k = clamp01((now - start) / duration);
+        const eased = 1 - Math.pow(1 - k, 3);
+        el.textContent = format(Math.round(target * eased));
+        if (k < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }, { threshold: 0.45 });
+
+    observer.observe(el);
+  });
+})();
 
 // ── Scene 5 horizontal gallery scroll ──────────────────────────────
 (function() {
