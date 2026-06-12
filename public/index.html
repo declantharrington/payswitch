@@ -1330,6 +1330,22 @@ h3,
   color: white;
 }
 
+ /* ── pin engine ── */
+.scene { position: relative; }
+.pin { position: relative; }
+.pin .pin-inner {
+  position: sticky;
+  top: 0;
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  overflow: clip;
+  padding: 0 clamp(20px, 5vw, 72px);
+}
+.wrap { max-width: 1240px; margin: 0 auto; width: 100%; position: relative; }
+[data-scrub="pin"] { --p: 0; }
+.scene-report { height: 300vh; }   /* scene 4's scroll runway */
+
 </style>
 </head>
 <body>
@@ -1822,6 +1838,78 @@ preloadStaticImage();
   });
 
   window.addEventListener('scroll', requestGalleryUpdate, { passive: true });
+})();
+
+ <script>
+(function(){
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var pins = Array.prototype.slice.call(document.querySelectorAll('[data-scrub="pin"], .scene-gallery'));
+  pins = pins.filter(function(el, i){ return pins.indexOf(el) === i; });
+  var gallery = document.querySelector('.scene-gallery');
+  var track = document.getElementById('galTrack');
+
+  if (reduce) {
+    pins.forEach(function(s){ s.style.height = 'auto'; s.style.setProperty('--p', 1); });
+    if (gallery) gallery.classList.add('no-pin');
+    return;
+  }
+
+  var travel = 0;
+  function size(){
+    if (gallery && track) {
+      var inner = gallery.querySelector('.pin-inner');
+      var innerH = inner ? inner.offsetHeight : window.innerHeight;
+      travel = Math.max(0, track.scrollWidth - window.innerWidth);
+      gallery.style.height = (Math.max(innerH, window.innerHeight) + travel) + 'px';
+    }
+  }
+  function update(){
+    var vh = window.innerHeight;
+    pins.forEach(function(scene){
+      var r = scene.getBoundingClientRect();
+      var inner = scene.querySelector('.pin-inner');
+      var stickH = inner ? Math.max(inner.offsetHeight, vh) : vh;
+      var range = scene.offsetHeight - stickH;
+      var p = range > 0 ? Math.min(1, Math.max(0, -r.top / range)) : 1;
+      scene.style.setProperty('--p', p);
+      if (scene === gallery && track) {
+        track.style.transform = 'translate3d(' + (-p * travel) + 'px,0,0)';
+      }
+    });
+  }
+  var ticking = false;
+  function onScroll(){
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function(){ update(); ticking = false; });
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', function(){ size(); update(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ size(); update(); });
+  size(); update();
+
+  // scene 4's $312,400 count-up
+  var counters = document.querySelectorAll('[data-count]');
+  if (counters.length && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (!e.isIntersecting || e.target._done) return;
+        e.target._done = true;
+        var end = parseInt(e.target.getAttribute('data-count'), 10);
+        var pre = e.target.getAttribute('data-prefix') || '';
+        var t0 = null;
+        function step(t){
+          if (!t0) t0 = t;
+          var k = Math.min(1, (t - t0) / 1600);
+          var ease = 1 - Math.pow(1 - k, 3);
+          e.target.textContent = pre + Math.round(end * ease).toLocaleString();
+          if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      });
+    }, {threshold: 0.5});
+    counters.forEach(function(c){ io.observe(c); });
+  }
 })();
 
 </script>
