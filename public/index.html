@@ -839,6 +839,113 @@ nav { padding: 16px 24px; }
   </div>
 </section>
 
+<!-- ================= SCENE 5 · HORIZONTAL GALLERY ================= -->
+<section class="scene pin scene-gallery" data-scrub="pin" data-gallery aria-label="Product gallery">
+  <div class="pin-inner">
+    <div class="gal-head">
+      <p>Inside the platform</p>
+      <h2>Everything your payments program is trying to tell you.</h2>
+    </div>
+    <div class="gal-track" id="galTrack">
+ 
+      <div class="gal-item">
+        <div class="frame-wrap device shot">
+          <img class="drop" src="/images/savings-summary.png" alt="Cost analysis screen" onerror="this.remove()">
+          <div class="bar" aria-hidden="true"><i></i><i></i><i></i><span class="url">app.payswitch.ai/costs</span></div>
+          <div class="gal-screen">
+            <div class="rep-head" style="margin-bottom:14px"><div><h6>Cost analysis</h6><p>Blended vs interchange-plus</p></div><span class="tag warn">$112K gap</span></div>
+            <div class="costbars">
+              <div class="cb"><span>Current blended</span><span class="track"><span class="fill in" style="--w:84%;width:84%"></span></span><b>1.42%</b></div>
+              <div class="cb"><span>IC+ modelled</span><span class="track"><span class="fill" style="--w:62%;width:62%"></span></span><b>1.19%</b></div>
+              <div class="cb"><span>Best-in-class</span><span class="track"><span class="fill" style="--w:54%;width:54%"></span></span><b>1.07%</b></div>
+            </div>
+            <div class="route-chip" style="margin-top:16px"><span>Scheme fee review · Amex cost review</span><b>2 flags</b></div>
+            <div class="mini-row"><span>Total processing volume</span><b>$48.2M</b></div>
+            <div class="mini-row" style="border:none"><span>Effective merchant service rate</span><b>1.42%</b></div>
+          </div>
+        </div>
+        <div class="lab"><i aria-hidden="true"></i>Cost analysis <span>· every basis point, explained</span></div>
+      </div>
+ 
+      <div class="gal-item">
+        <div class="frame-wrap device shot">
+          <img class="drop" src="/images/provider-comparison.png" alt="Provider benchmark screen" onerror="this.remove()">
+          <div class="bar" aria-hidden="true"><i></i><i></i><i></i><span class="url">app.payswitch.ai/benchmark</span></div>
+          <div class="gal-screen">
+            <div class="rep-head" style="margin-bottom:14px"><div><h6>Provider benchmark</h6><p>Anonymised market data · your category</p></div><span class="tag">Top quartile gap</span></div>
+            <div class="bench" style="gap:10px">
+              <div class="row you"><span>Your stack</span><span class="track"><span class="fill" style="--w:78%"></span><span class="mark"></span></span></div>
+              <div class="row"><span>Acquirer B</span><span class="track"><span class="fill" style="--w:61%"></span><span class="mark"></span></span></div>
+              <div class="row"><span>Acquirer C</span><span class="track"><span class="fill" style="--w:55%"></span><span class="mark"></span></span></div>
+              <div class="row"><span>Acquirer D</span><span class="track"><span class="fill" style="--w:47%"></span><span class="mark"></span></span></div>
+              <div class="row"><span>Top quartile</span><span class="track"><span class="fill" style="--w:40%"></span><span class="mark"></span></span></div>
+            </div>
+            <div class="mini-row" style="margin-top:12px"><span>Estimated repricing benefit</span><b>$118K/yr</b></div>
+            <div class="mini-row" style="border:none"><span>Confidence</span><b>High · 14 comparable merchants</b></div>
+          </div>
+        </div>
+        <div class="lab"><i aria-hidden="true"></i>Provider benchmark <span>· vs the market, not a sales pitch</span></div>
+      </div>
+ 
+      <div class="gal-item slim">
+        <div class="frame-wrap phone shot" style="width:100%">
+          <img class="drop" src="/images/dashboard.png" alt="Routing opportunities on mobile" onerror="this.remove()" style="border-radius:26px">
+          <div class="screen"><span class="notch" aria-hidden="true"></span>
+            <div class="phone-rep">
+              <div><h6>Routing</h6><p style="margin-top:4px">Least-cost routing model</p></div>
+              <div class="save-card" style="padding:11px"><div class="lbl">LCR opportunity</div><div class="num" style="font-size:21px">$86K/yr</div><div class="per">64% of debit eligible</div></div>
+              <div class="mini-row"><span>Dual-network volume</span><b>$19.6M</b></div>
+              <div class="mini-row"><span>Avg. saving per txn</span><b>9.4¢</b></div>
+              <div class="mini-row" style="border:none"><span>Switch effort</span><b>Low</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="lab"><i aria-hidden="true"></i>Routing opportunities</div>
+      </div>
+ 
+      <div class="gal-item">
+        <div class="frame-wrap glass-panel glassy shot">
+          <img class="drop" src="/images/ai-chat.png" alt="AI recommendations panel" onerror="this.remove()" style="border-radius:18px">
+          <div class="rep-head" style="margin-bottom:14px"><div><h6>AI recommendations</h6><p>Acceptance &amp; fraud observations</p></div><span class="tag pos">+1.8% approvals</span></div>
+          <div class="donut-row">
+            <div class="donut" aria-hidden="true"><b>91.3%</b></div>
+            <div class="legend">
+              <div><i style="background:var(--glow)"></i>Approved · 91.3%</div>
+              <div><i style="background:#6d9bff"></i>Soft declines (05, 51) · retryable</div>
+              <div><i style="background:#2c4a8f"></i>Hard declines (14, 54)</div>
+              <div><i style="background:rgba(126,160,255,.3)"></i>Fraud rules · 3 over-strict</div>
+            </div>
+          </div>
+          <div class="mini-row" style="margin-top:14px"><span>Decline code 05 (do not honour)</span><b>4.1% · above range</b></div>
+          <div class="mini-row" style="border:none"><span>Recoverable with retry + 3DS tuning</span><b>~$860K volume</b></div>
+        </div>
+        <div class="lab"><i aria-hidden="true"></i>AI recommendations <span>· approvals, declines, fraud</span></div>
+      </div>
+ 
+      <div class="gal-item">
+        <div class="frame-wrap device shot">
+          <img class="drop" src="/images/report-cover.png" alt="Executive report" onerror="this.remove()">
+          <div class="bar" aria-hidden="true"><i></i><i></i><i></i><span class="url">app.payswitch.ai/report</span></div>
+          <div class="gal-screen" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="save-card"><div class="lbl">Executive summary</div><div class="num" style="font-size:24px">$312,400</div><div class="per">estimated annual savings</div></div>
+            <div class="dcard"><h5>Recommended next actions</h5>
+              <div class="mini-row"><span>1 · Enable LCR</span><b>$86K</b></div>
+              <div class="mini-row"><span>2 · Move to IC+</span><b>$112K</b></div>
+              <div class="mini-row"><span>3 · Amex review</span><b>$64K</b></div>
+              <div class="mini-row" style="border:none"><span>4 · Acceptance tuning</span><b>$50K</b></div>
+            </div>
+            <div class="dcard" style="grid-column:1/-1"><h5>Share-ready</h5>
+              <p style="font-size:11px;color:var(--mut)">22-page PDF · board-ready charts · provider-neutral · exportable to your CFO in one click.</p>
+            </div>
+          </div>
+        </div>
+        <div class="lab"><i aria-hidden="true"></i>Executive report</div>
+      </div>
+ 
+    </div>
+  </div>
+</section> 
+
 <!-- OUTRO -->
 <section class="outro-section">
   <h2 class="outro-headline">
