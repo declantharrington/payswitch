@@ -1189,6 +1189,137 @@ nav { padding: 16px 24px; }
   .gal-track { overflow-x: auto; transform: none !important; padding-bottom: 20px; }
 }
 
+/* ─────────────────────────────────────────────
+   TYPOGRAPHY ALIGNMENT WITH FABLE WEBSITE
+───────────────────────────────────────────── */
+
+:root {
+  --display: 'Manrope', sans-serif;
+  --body: 'Inter', sans-serif;
+  --ink: var(--text-primary);
+  --mut: var(--text-muted);
+  --mut2: rgba(200,210,240,.34);
+}
+
+/* Global typography */
+body {
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+.scene-h,
+.gal-head h2,
+.outro-headline {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+}
+
+/* Hero typography */
+.hero-content h1 {
+  font-size: clamp(44px, 5.2vw, 80px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  max-width: 12ch;
+}
+
+.hero-sub {
+  font-size: clamp(17px, 1.5vw, 20px);
+  line-height: 1.65;
+  max-width: 42ch;
+  color: var(--mut);
+}
+
+/* CTA sizing */
+.hero-cta-btn {
+  font-size: 15px;
+  padding: 13px 26px;
+  border-radius: 999px;
+}
+
+/* Scene 4 heading */
+.scene-h {
+  font-size: clamp(34px, 4.4vw, 64px);
+  max-width: 15ch;
+}
+
+.scene-sub {
+  font-size: clamp(16px, 1.4vw, 19px);
+  line-height: 1.65;
+  max-width: 44ch;
+}
+
+/* Scene 5 gallery heading */
+.gal-head h2 {
+  font-size: clamp(26px, 3vw, 44px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  max-width: 22ch;
+}
+
+.gal-head p {
+  font-size: 13px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* Scene 5 internal card text */
+.gal-screen {
+  font-size: 11px;
+}
+
+.rep-head h6 {
+  font-size: 13px;
+  line-height: 1.02;
+}
+
+.rep-head p {
+  font-size: 10px;
+}
+
+.tag {
+  font-size: 10px;
+}
+
+.mini-row {
+  font-size: 11px;
+}
+
+.cb {
+  font-size: 10px;
+}
+
+.gal-item .lab {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.gal-item .lab span {
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+/* Mobile */
+@media (max-width: 520px) {
+  .hero-content h1 {
+    font-size: 40px;
+  }
+
+  .scene-h {
+    font-size: 38px;
+  }
+
+  .gal-head h2 {
+    font-size: 32px;
+  }
+}
+ 
 </style>
 </head>
 <body>
