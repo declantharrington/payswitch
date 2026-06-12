@@ -148,139 +148,65 @@
     box-shadow: 0 0 20px rgba(26,107,255,0.25);
   }
 
-  /* ── HERO HEADLINE ── */
-  .hero-headline-wrap {
-    position: relative;
-    z-index: 10;
-    padding: 160px 60px 60px;
-    text-align: center;
-  }
+/* ── HERO SECTION ── */
+.hero-section {
+  position: relative;
+  min-height: 100vh;
+  padding: 180px 60px 240px;
+  background:
+    linear-gradient(to bottom, rgba(2,4,8,0.1) 0%, rgba(2,4,8,0.18) 55%, var(--black) 100%),
+    url("hero-background.png") center center / cover no-repeat;
+  overflow: visible;
+}
 
-  .eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-family: 'Inter', sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--blue-glow);
-    margin-bottom: 28px;
-  }
-  .eyebrow::before, .eyebrow::after {
-    content: '';
-    display: block;
-    width: 36px;
-    height: 1px;
-    background: var(--blue-glow);
-    opacity: 0.5;
-  }
+.hero-content {
+  position: relative;
+  z-index: 5;
+  max-width: 720px;
+  margin-left: clamp(20px, 8vw, 130px);
+  text-align: left;
+}
 
-  h1 {
-    font-family: 'Manrope', sans-serif;
-    font-size: clamp(52px, 7vw, 108px);
-    font-weight: 800;
-    line-height: 1.08;
-    letter-spacing: -0.04em;
-    color: #FFFFFF;
-    text-shadow:
-      0 0 60px rgba(58, 138, 255, 0.35),
-      0 0 120px rgba(58, 138, 255, 0.15),
-      0 0 200px rgba(58, 138, 255, 0.08);
-    max-width: 1000px;
-    margin: 0 auto 30px;
-    padding: 0.08em 0 0.14em;
-    overflow: visible;
-  }
-
-  .gradient-text {
-    display: inline-block;
-    font-size: 1.14em;
-    line-height: 1;
-    padding: 0 0.025em 0.04em;
-    background: linear-gradient(
-      90deg,
-      #ffffff 0%,
-      #b7d3ff 20%,
-      #1A6BFF 50%,
-      #6aa7ff 80%,
-      #ffffff 100%
-    );
-    background-size: 300% 100%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: shimmer 8s linear infinite;
-    text-shadow: none;
-  }
-
-  @keyframes shimmer {
-    from { background-position: 0% 0%; }
-    to { background-position: 300% 0%; }
-  }
+.hero-content h1 {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(52px, 5.6vw, 92px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  color: #fff;
+  margin: 0 0 28px;
+  max-width: 760px;
+  text-shadow: 0 0 60px rgba(58,138,255,0.18);
+}
 
 .hero-sub {
-  font-size: 28px;
+  font-size: clamp(18px, 1.45vw, 24px);
   font-weight: 300;
-  color: var(--text-muted);
-  max-width: 1000px;
-  margin: 0 auto;
-  line-height: 1.55;
+  color: rgba(255,255,255,0.78);
+  max-width: 620px;
+  margin: 0 0 42px;
+  line-height: 1.5;
   letter-spacing: 0.01em;
 }
-  
 
-  /* ── STATIC PRODUCT IMAGE SECTION ── */
-  .static-image-section {
-    position: relative;
-    padding: clamp(80px, 10vh, 140px) 60px clamp(100px, 12vh, 160px);
-    background: #000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-  }
+.hero-device-wrap {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  bottom: -170px;
+  transform: translateX(-50%);
+  width: min(980px, 72vw);
+  pointer-events: none;
+}
 
-  .static-image-section::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse 70% 55% at 50% 50%, rgba(26,107,255,0.10) 0%, transparent 52%),
-      radial-gradient(ellipse 90% 65% at 50% 50%, transparent 35%, rgba(0,0,0,0.84) 100%);
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  .static-image-section::after {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 180px;
-    background: linear-gradient(to bottom, transparent, var(--black));
-    pointer-events: none;
-    z-index: 2;
-  }
-
-  .static-image-wrap {
-    position: relative;
-    z-index: 3;
-    width: min(1040px, 88vw);
-    margin: 0 auto;
-    border-radius: 24px;
-    overflow: visible;
-    filter: drop-shadow(0 40px 120px rgba(0,0,0,0.9))
-            drop-shadow(0 0 80px rgba(26,107,255,0.10));
-  }
-
-  .static-image-wrap img {
-    width: 100%;
-    height: auto;
-    display: block;
-    user-select: none;
-    pointer-events: none;
-  }
+.hero-device-wrap img {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter:
+    drop-shadow(0 45px 95px rgba(0,0,0,0.85))
+    drop-shadow(0 0 60px rgba(26,107,255,0.14));
+}
 
   /* ── AFTER-SCROLL SECTION ── */
   .outro-section {
@@ -397,7 +323,7 @@
 
   /* ── FEATURES GRID ── */
   .features-section {
-    padding: 100px 60px 50px;
+    padding: 240px 60px 50px;
     position: relative;
     z-index: 10;
   }
@@ -1270,23 +1196,20 @@ nav { padding: 16px 24px; }
   <a href="#" class="nav-cta">Get Started</a>
 </nav>
 
-<!-- HERO HEADLINE -->
-<div class="hero-headline-wrap">
-  <h1>AI-powered payments<br><span class="gradient-text">consultancy</span></h1>
-  <p class="hero-sub">Upload a merchant statement. Get an <b>AI-powered payments assessment</b> in minutes. </p>
-</div>
+<!-- HERO -->
+<section class="hero-section">
+  <div class="hero-content">
+    <h1>AI-powered payments<br><span class="gradient-text">consultancy</span></h1>
+    <p class="hero-sub">Upload a merchant statement. Get an <b>AI-powered payments assessment</b> in minutes.</p>
 
- <div class="hero-cta-wrap">
-  <a href="/analyser.html" class="hero-cta-btn">
-   Get My Free Assessment
-    <span class="hero-cta-arrow">→</span>
-  </a>
-</div>
- 
-<!-- STATIC PRODUCT IMAGE SECTION -->
-<section class="static-image-section">
-  <div class="static-image-wrap">
-    <img src="terminal-stack.png" alt="PaySwitch payment stack preview" id="terminalStackImage">
+    <a href="/analyser.html" class="hero-cta-btn">
+      Get My Free Assessment
+      <span class="hero-cta-arrow">→</span>
+    </a>
+  </div>
+
+  <div class="hero-device-wrap">
+    <img src="device-image.png" alt="PaySwitch dashboard and report preview" id="deviceImage">
   </div>
 </section>
 
@@ -1549,7 +1472,7 @@ nav { padding: 16px 24px; }
 const loaderBar = document.getElementById('loaderBar');
 const loaderPct = document.getElementById('loaderPct');
 const loader = document.getElementById('loader');
-const terminalStackImage = document.getElementById('terminalStackImage');
+const terminalStackImage = document.getElementById('deviceImage');
 
 let loaderHidden = false;
 
