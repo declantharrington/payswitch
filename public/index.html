@@ -769,18 +769,6 @@ nav { padding: 16px 24px; }
 .report-visual .phone{position:absolute;right:-26px;bottom:-60px;z-index:6;
   --t:clamp(0, calc((var(--p) - .3) * 4), 1);
   opacity:var(--t);transform:translateY(calc((1 - var(--t)) * 90px)) rotate(calc(4deg + (1 - var(--t)) * 6deg))}
-/* fanned PDF pages */
-.fan{position:absolute;left:-58px;top:-50px;z-index:2;width:170px}
-.fan .page{position:absolute;width:160px;aspect-ratio:1/1.34;border-radius:10px;background:linear-gradient(170deg,#101b32,#080d1a);
-  border:1px solid rgba(140,172,255,.22);box-shadow:0 20px 60px rgba(0,2,10,.7);padding:13px;
-  --t:clamp(0, calc((var(--p) - var(--d)) * 4), 1);opacity:var(--t)}
-.fan .page:nth-child(1){transform:rotate(calc(var(--t) * -14deg)) translateX(calc(var(--t) * -26px))}
-.fan .page:nth-child(2){transform:rotate(calc(var(--t) * -5deg)) translateY(calc(var(--t) * -10px))}
-.fan .page:nth-child(3){transform:rotate(calc(var(--t) * 6deg)) translateX(calc(var(--t) * 22px))}
-.fan .skel{margin-bottom:7px}
-.fan .skel.t{width:62%;height:9px;background:rgba(156,192,255,.3)}
-.fan .bars{display:flex;align-items:flex-end;gap:5px;height:46px;margin-top:12px}
-.fan .bars i{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--blue-glow),#0d4ed1);opacity:.85}
 /* report screen content */
 .rep-screen{padding:16px 18px;font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:300px}
 .rep-screen .full{grid-column:1/-1}
