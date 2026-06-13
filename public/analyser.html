@@ -120,11 +120,11 @@ body::after {
 
 .screen {
   position: absolute; width: 100%; max-width: 620px;
-  max-height: calc(100dvh - 150px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  overflow-y: auto; overflow-x: hidden;
   padding-right: 2px;
   opacity: 0; pointer-events: none;
-  transform: translateX(48px);
+  transform: translateX(48px) scale(var(--fit, 1));
+  transform-origin: center center;
+  will-change: transform;
   transition: opacity 0.45s cubic-bezier(0.22,1,0.36,1),
               transform 0.45s cubic-bezier(0.22,1,0.36,1);
   scrollbar-width: thin;
@@ -132,10 +132,10 @@ body::after {
 }
 .screen::-webkit-scrollbar { width: 6px; }
 .screen::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
-.screen.active   { opacity: 1; pointer-events: all; transform: translateX(0); }
-.screen.exit     { opacity: 0; transform: translateX(-48px); pointer-events: none; }
-.screen.exit-back{ opacity: 0; transform: translateX(48px);  pointer-events: none; }
-.screen.enter-back { transform: translateX(-48px); }
+.screen.active   { opacity: 1; pointer-events: all; transform: translateX(0) scale(var(--fit, 1)); }
+.screen.exit     { opacity: 0; transform: translateX(-48px) scale(var(--fit, 1)); pointer-events: none; }
+.screen.exit-back{ opacity: 0; transform: translateX(48px) scale(var(--fit, 1));  pointer-events: none; }
+.screen.enter-back { transform: translateX(-48px) scale(var(--fit, 1)); }
 
 .q-text {
   font-family: 'Manrope', sans-serif; font-size: clamp(32px, 4.5vw, 52px);
@@ -364,6 +364,12 @@ input#fileInput { display: none; }
   .stage {
     padding-top: calc(72px + env(safe-area-inset-top)); padding-bottom: calc(72px + env(safe-area-inset-bottom));
     padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right));
+  }
+  /* Phones scroll rather than scale, so tap targets stay full size */
+  .screen {
+    --fit: 1 !important;
+    max-height: calc(100dvh - 132px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow-y: auto; overflow-x: hidden;
   }
   .back-btn { left: max(20px, env(safe-area-inset-left)); bottom: calc(24px + env(safe-area-inset-bottom)); }
   .key-hint { display: none; }
@@ -732,7 +738,7 @@ input#fileInput { display: none; }
     <div class="q-text">Anything else<br>frustrating you?</div>
     <div class="q-sub">What made you start looking? Be as specific as you like — chargebacks, surprise fees, clunky hardware. This shapes what we prioritise.</div>
     <div class="q-input-wrap">
-      <textarea class="q-input" id="inp-pain" aria-label="Your biggest frustration" placeholder="e.g. Fees feel too high but I can't figure out why. I'm getting chargebacks I can't explain…" rows="3" style="resize:none;font-size:18px;line-height:1.55;padding-top:8px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';data.pain=this.value.trim()"></textarea>
+      <textarea class="q-input" id="inp-pain" aria-label="Your biggest frustration" placeholder="e.g. Fees feel too high but I can't figure out why. I'm getting chargebacks I can't explain…" rows="3" style="resize:none;font-size:18px;line-height:1.55;padding-top:8px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';data.pain=this.value.trim();refit()"></textarea>
     </div>
     <div class="cta-row">
       <button class="cta" id="ctaS8" onclick="next()">
@@ -847,6 +853,40 @@ function updateChrome() {
   document.getElementById('keyHint').style.display = KEYHINT_SCREENS.includes(currentId) ? 'flex' : 'none';
 }
 
+// Scale a screen down just enough to fit the visible stage, so the user
+// rarely has to scroll on desktop. Phones keep their native scroll (the
+// media query forces --fit:1), so this only does work on wider screens.
+const FIT_FLOOR = 0.62; // don't shrink past this — fall back to scroll instead
+function stageAvailable() {
+  const stage = document.querySelector('.stage');
+  const cs = getComputedStyle(stage);
+  return stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+}
+function applyFit(screen) {
+  if (!screen) return;
+  if (window.innerWidth <= 600) { screen.style.removeProperty('--fit'); return; }
+  // measure at full size
+  screen.style.setProperty('--fit', '1');
+  screen.style.maxHeight = 'none';
+  screen.style.overflowY = 'visible';
+  const avail = stageAvailable();
+  const natural = screen.scrollHeight;
+  let scale = natural > 0 ? Math.min(1, avail / natural) : 1;
+  if (scale < FIT_FLOOR) {            // too tall even scaled — cap and let it scroll
+    scale = FIT_FLOOR;
+    screen.style.maxHeight = (avail / scale) + 'px';
+    screen.style.overflowY = 'auto';
+  }
+  screen.style.setProperty('--fit', scale.toFixed(4));
+}
+function refit() { applyFit(document.getElementById(currentId)); }
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(refit, 120);
+});
+
 function show(id, reverse) {
   if (busy || id === currentId) return;
   const from = document.getElementById(currentId);
@@ -854,8 +894,11 @@ function show(id, reverse) {
   if (!to) return;
   busy = true;
 
+  if (id === 'sReview') renderReview();   // populate before measuring height
+
   to.scrollTop = 0;
   to.classList.remove('active','exit','exit-back','enter-back');
+  applyFit(to);                            // scale to fit the viewport before it animates in
   if (reverse) to.classList.add('enter-back');
   void to.offsetWidth; // reflow so the enter transform applies
 
@@ -867,7 +910,6 @@ function show(id, reverse) {
   currentId = id;
   renderProgress();
   updateChrome();
-  if (id === 'sReview') renderReview();
 
   setTimeout(() => {
     from.classList.remove('exit','exit-back');
@@ -1030,6 +1072,7 @@ function renderChips() {
       label +
       '<button class="file-chip-remove" aria-label="Remove file" onclick="removeFile(' + i + ')">×</button></div>';
   }).join('');
+  refit();
 }
 function skipUpload(){ data.skippedUpload = true; next(); }
 
@@ -1158,10 +1201,19 @@ function renderReview() {
 }
 
 // ---- Submit ----
+// Wrap fetch so a hung/unreachable endpoint fails with a clear error
+// instead of leaving the user stuck on the loading screen forever.
+function fetchWithTimeout(url, opts, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, Object.assign({}, opts, { signal: ctrl.signal })).finally(() => clearTimeout(t));
+}
+
 async function submitAll() {
   const loading = document.getElementById('sLoading');
   document.getElementById('sReview').classList.remove('active');
   loading.classList.add('active');
+  applyFit(loading);
   document.getElementById('backBtn').style.display = 'none';
   document.getElementById('keyHint').style.display = 'none';
   document.getElementById('progressFill').style.width = '100%';
@@ -1237,10 +1289,10 @@ Return this exact structure:
       content = [{ type:'text', text:'No statements uploaded. Analyse based on the merchant profile only.' + suffix }];
     }
 
-    const res = await fetch('/api/analyse', {
+    const res = await fetchWithTimeout('/api/analyse', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system, messages: [{ role: 'user', content }] })
-    });
+    }, 90000);
     if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error((e && e.error && e.error.message) || ('API error ' + res.status)); }
 
     const apiData = await res.json();
@@ -1253,23 +1305,31 @@ Return this exact structure:
       name: f.name, type: f.type, size: f.size, data: await fileToB64(f)
     })));
 
-    await fetch('/api/submit', {
+    await fetchWithTimeout('/api/submit', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         report, programContext, files: filesPayload,
         submission: { name: data.name, email: data.email, phone: data.phone, submittedAt: new Date().toISOString() }
       })
-    }).catch(() => null);
+    }, 30000).catch(() => null);
 
     clearInterval(iv);
     steps.forEach(id => document.getElementById(id).className = 'loading-step done');
-    setTimeout(() => { loading.classList.remove('active'); document.getElementById('sConfirm').classList.add('active'); }, 500);
+    setTimeout(() => {
+      loading.classList.remove('active');
+      const c = document.getElementById('sConfirm');
+      c.classList.add('active');
+      applyFit(c);
+    }, 500);
 
   } catch (err) {
     clearInterval(iv);
     loading.classList.remove('active');
     document.getElementById('sReview').classList.add('active');
-    alert('Something went wrong running your analysis: ' + err.message + '\n\nYour answers are saved — please try submitting again.');
+    const msg = err && err.name === 'AbortError'
+      ? 'The server didn\'t respond in time, so the analysis was cancelled. Your answers are saved — please try submitting again.'
+      : 'Something went wrong running your analysis: ' + (err && err.message ? err.message : err) + '\n\nYour answers are saved — please try submitting again.';
+    alert(msg);
   }
 }
 
@@ -1284,6 +1344,18 @@ function fileToB64(file) {
 
 renderProgress();
 updateChrome();
+refit();
+window.addEventListener('load', refit);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
+
+// Dev helper: run previewSuccess() in the browser console to jump straight
+// to the confirmation page and verify it renders (no backend needed).
+window.previewSuccess = function () {
+  const cur = document.getElementById(currentId);
+  if (cur) cur.classList.remove('active');
+  const c = document.getElementById('sConfirm');
+  c.classList.add('active'); currentId = 'sConfirm'; applyFit(c);
+};
 </script>
 </body>
 </html>
