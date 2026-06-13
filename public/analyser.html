@@ -1209,6 +1209,61 @@ function fetchWithTimeout(url, opts, ms) {
   return fetch(url, Object.assign({}, opts, { signal: ctrl.signal })).finally(() => clearTimeout(t));
 }
 
+function stripTrailingCommas(s) { return s.replace(/,(\s*[}\]])/g, '$1'); }
+
+// String-aware: return the substring from `start` to the brace that closes the
+// top-level object, or null if it never closes (i.e. the response was cut off).
+function balancedSlice(t, start) {
+  const stack = []; let inStr = false, esc = false;
+  for (let i = start; i < t.length; i++) {
+    const c = t[i];
+    if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === '{' || c === '[') stack.push(c);
+    else if (c === '}' || c === ']') { stack.pop(); if (!stack.length) return t.slice(start, i + 1); }
+  }
+  return null;
+}
+
+// Given a possibly-truncated fragment, balance any open brackets/braces and
+// return a closeable candidate string (or null if it ends mid-string).
+function balanceAndClose(s) {
+  const stack = []; let inStr = false, esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === '{' || c === '[') stack.push(c);
+    else if (c === '}' || c === ']') stack.pop();
+  }
+  if (inStr) return null;                       // not a clean boundary
+  let out = s.replace(/[\s,:]+$/, '');          // drop dangling comma/colon/space
+  for (let i = stack.length - 1; i >= 0; i--) out += (stack[i] === '{' ? '}' : ']');
+  return out;
+}
+
+// Turn the model's text into an object. Handles code fences and prose around
+// the JSON, and recovers a max_tokens-truncated response by trimming back to
+// the last complete value and closing the structure.
+function parseModelJson(raw) {
+  let t = String(raw || '').trim();
+  t = t.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+  const start = t.indexOf('{');
+  if (start === -1) throw new Error('No JSON object found in the response.');
+
+  const sliced = balancedSlice(t, start) || t.slice(start);
+  try { return JSON.parse(stripTrailingCommas(sliced)); } catch (e) { /* fall through to repair */ }
+
+  console.warn('Payswitch: /api/analyse response was truncated — recovering a partial report. Raise max_tokens on that function to capture the full report.');
+  const limit = Math.max(1, sliced.length - 6000); // don't trim back further than ~6k chars
+  for (let cut = sliced.length; cut > limit; cut--) {
+    const candidate = balanceAndClose(sliced.slice(0, cut));
+    if (candidate == null) continue;
+    try { return JSON.parse(stripTrailingCommas(candidate)); } catch (e) { /* keep trimming */ }
+  }
+  throw new Error('The report was cut off by the server and couldn\'t be recovered. Raise max_tokens on the /api/analyse function, then try again.');
+}
+
 async function submitAll() {
   const loading = document.getElementById('sLoading');
   document.getElementById('sReview').classList.remove('active');
@@ -1297,9 +1352,7 @@ Return this exact structure:
 
     const apiData = await res.json();
     const rawText = (apiData.content.find(b => b.type === 'text')?.text || '');
-    const sIdx = rawText.indexOf('{'), eIdx = rawText.lastIndexOf('}');
-    if (sIdx === -1 || eIdx === -1) throw new Error('No JSON found in response');
-    const report = JSON.parse(rawText.slice(sIdx, eIdx + 1));
+    const report = parseModelJson(rawText);
 
     const filesPayload = await Promise.all(data.files.map(async f => ({
       name: f.name, type: f.type, size: f.size, data: await fileToB64(f)
