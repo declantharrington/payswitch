@@ -830,6 +830,15 @@ nav { padding: 16px 24px; }
           drop-shadow(0 0 90px rgba(26,107,255,.14));
 }
 
+ /* scene 4: start half-visible instead of invisible */
+.report-copy .scene-h,
+.report-copy .scene-sub {
+  opacity: calc(.5 + clamp(0, (var(--p) - .05) * 5, 1) * .5);
+}
+.report-visual .macbook {
+  opacity: calc(.5 + clamp(0, (var(--p) - .04) * 5, 1) * .5);
+}
+
 /* ─────────────────────────────────────────────────────────────
    SCENE 5 — HORIZONTAL PRODUCT GALLERY
    Added from Fable Website and adapted for Existing Website
