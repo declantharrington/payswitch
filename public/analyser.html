@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Payswitch — get an AI-reviewed, human-verified analysis of your payments setup and fees.">
 <title>Payswitch — Payments Review</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- SheetJS: parses CSV/XLSX dashboard exports client-side so they actually reach the AI -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --black:       #020408;
@@ -15,10 +19,11 @@
   --glass:       rgba(255,255,255,0.04);
   --glass-border:rgba(255,255,255,0.08);
   --text-primary:#F0F4FF;
-  --text-muted:  rgba(200, 210, 240, 0.55);
+  --text-muted:  rgba(206, 215, 242, 0.64);
+  --text-faint:  rgba(206, 215, 242, 0.38);
   --bg:      #020408;
   --white:   #F0F4FF;
-  --muted:   rgba(200, 210, 240, 0.55);
+  --muted:   rgba(206, 215, 242, 0.64);
   --border:  rgba(255,255,255,0.08);
   --glow:    #3A8AFF;
   --sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -28,7 +33,11 @@
 html, body { height: 100%; overflow: hidden; }
 body {
   font-family: var(--sans); background: var(--black); color: var(--text-primary);
-  -webkit-font-smoothing: antialiased; cursor: default;
+  /* Crispness fix: the full macOS antialiasing pair + better hinting. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  cursor: default;
 }
 
 body::after {
@@ -44,10 +53,14 @@ body::after {
 .ambient-1 { width: 700px; height: 700px; top: -200px; right: -200px; }
 .ambient-2 { width: 500px; height: 500px; bottom: -150px; left: -100px; opacity: 0.6; }
 
+/* Top bar: background fills under the notch; content padded into the safe area */
 .chrome {
   position: fixed; top: 0; left: 0; right: 0; z-index: 500;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 60px;
+  padding-top: calc(20px + env(safe-area-inset-top));
+  padding-bottom: 20px;
+  padding-left: max(60px, env(safe-area-inset-left));
+  padding-right: max(60px, env(safe-area-inset-right));
   background: rgba(2, 4, 8, 0.7);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--glass-border);
@@ -78,53 +91,69 @@ body::after {
   box-shadow: 0 0 16px rgba(26,107,255,0.4);
 }
 
-.progress-track {
-  display: flex; align-items: center; gap: 6px;
+.progress-wrap { display: flex; align-items: center; gap: 12px; min-width: 200px; }
+.progress-label {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
+  color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-.progress-pip {
-  width: 24px; height: 3px; border-radius: 2px;
-  background: rgba(255,255,255,0.1); transition: all 0.4s ease;
+.progress-bar {
+  flex: 1; height: 4px; border-radius: 4px;
+  background: rgba(255,255,255,0.08); overflow: hidden;
 }
-.progress-pip.done { background: var(--blue); }
-.progress-pip.active { background: var(--blue-glow); width: 32px; box-shadow: 0 0 8px rgba(58,138,255,0.5); }
+.progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--blue), var(--blue-glow));
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(58,138,255,0.5);
+  transition: width 0.45s cubic-bezier(0.22,1,0.36,1);
+}
 
+/* Stage gutters are safe-area aware on all four sides */
 .stage {
   position: fixed; inset: 0; z-index: 1;
   display: flex; align-items: center; justify-content: center;
-  padding: 80px 40px 80px;
+  padding-top: calc(80px + env(safe-area-inset-top));
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  padding-left: max(40px, env(safe-area-inset-left));
+  padding-right: max(40px, env(safe-area-inset-right));
 }
 
 .screen {
   position: absolute; width: 100%; max-width: 620px;
+  max-height: calc(100dvh - 150px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto; overflow-x: hidden;
+  padding-right: 2px;
   opacity: 0; pointer-events: none;
   transform: translateX(48px);
   transition: opacity 0.45s cubic-bezier(0.22,1,0.36,1),
               transform 0.45s cubic-bezier(0.22,1,0.36,1);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
 }
-.screen.active {
-  opacity: 1; pointer-events: all; transform: translateX(0);
-}
-.screen.exit {
-  opacity: 0; transform: translateX(-48px); pointer-events: none;
-}
+.screen::-webkit-scrollbar { width: 6px; }
+.screen::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+.screen.active   { opacity: 1; pointer-events: all; transform: translateX(0); }
+.screen.exit     { opacity: 0; transform: translateX(-48px); pointer-events: none; }
+.screen.exit-back{ opacity: 0; transform: translateX(48px);  pointer-events: none; }
+.screen.enter-back { transform: translateX(-48px); }
 
 .q-text {
   font-family: 'Manrope', sans-serif; font-size: clamp(32px, 4.5vw, 52px);
   font-weight: 800; line-height: 1.08; letter-spacing: -0.04em;
   color: #FFFFFF; margin-bottom: 10px;
-  text-shadow:
-    0 0 60px rgba(58,138,255,0.35),
-    0 0 120px rgba(58,138,255,0.15),
-    0 0 200px rgba(58,138,255,0.08);
+  text-shadow: 0 0 38px rgba(58,138,255,0.20);
 }
 
 .q-sub {
   font-size: 15px; color: var(--text-muted); line-height: 1.65;
   margin-bottom: 36px; max-width: 480px; font-weight: 300;
 }
+.q-sub b { font-weight: 500; color: var(--text-primary); }
 
-.q-input-wrap {
-  position: relative; margin-bottom: 24px;
+.q-input-wrap { position: relative; margin-bottom: 24px; }
+.q-label {
+  display: block; font-size: 12px; font-weight: 500; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;
 }
 .q-input {
   width: 100%; background: transparent; border: none;
@@ -135,11 +164,9 @@ body::after {
   caret-color: var(--blue-glow);
 }
 .q-input:focus { border-bottom-color: var(--blue-glow); }
-.q-input::placeholder { color: rgba(255,255,255,0.15); }
+.q-input::placeholder { color: rgba(255,255,255,0.18); }
 
-.otp-digits {
-  display: flex; gap: 10px; margin-bottom: 8px;
-}
+.otp-digits { display: flex; gap: 10px; margin-bottom: 8px; }
 .otp-digit {
   width: 52px; height: 64px; background: var(--glass);
   border: 1px solid var(--glass-border); border-radius: 10px;
@@ -151,9 +178,7 @@ body::after {
 .otp-digit:focus { border-color: var(--blue-glow); background: rgba(26,107,255,0.08); }
 .otp-digit.filled { border-color: rgba(58,138,255,0.4); }
 
-.choice-grid {
-  display: grid; gap: 8px; margin-bottom: 28px;
-}
+.choice-grid { display: grid; gap: 8px; margin-bottom: 28px; }
 .choice-grid.cols-2 { grid-template-columns: 1fr 1fr; }
 .choice-grid.cols-1 { grid-template-columns: 1fr; }
 
@@ -172,6 +197,7 @@ body::after {
 }
 .choice:hover { border-color: rgba(26,107,255,0.25); box-shadow: 0 0 40px rgba(26,107,255,0.06); transform: translateY(-1px); }
 .choice:hover::before { opacity: 0.6; }
+.choice:focus-visible { outline: 2px solid var(--blue-glow); outline-offset: 2px; }
 .choice.selected {
   background: linear-gradient(160deg, rgba(26,107,255,0.12) 0%, rgba(10,16,35,0.95) 100%);
   border-color: rgba(26,107,255,0.4);
@@ -203,9 +229,8 @@ body::after {
   transition: all 0.3s; background: rgba(255,255,255,0.02);
   margin-bottom: 16px; position: relative; overflow: hidden;
 }
-.upload-zone:hover, .upload-zone.drag-over {
-  border-color: var(--blue); background: rgba(26,107,255,0.05);
-}
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--blue); background: rgba(26,107,255,0.05); }
+.upload-zone:focus-visible { outline: 2px solid var(--blue-glow); outline-offset: 3px; }
 .upload-icon {
   width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 18px;
   background: linear-gradient(135deg, rgba(26,107,255,0.15), rgba(26,107,255,0.04));
@@ -215,7 +240,7 @@ body::after {
 .upload-icon svg { width: 24px; height: 24px; stroke: var(--glow); stroke-width: 1.5; fill: none; }
 .upload-title { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin-bottom: 8px; }
 .upload-sub { font-size: 13px; color: var(--text-muted); line-height: 1.65; }
-.upload-formats { font-size: 11px; color: rgba(255,255,255,0.2); margin-top: 12px; letter-spacing: 0.06em; }
+.upload-formats { font-size: 11px; color: var(--text-faint); margin-top: 12px; letter-spacing: 0.06em; }
 input#fileInput { display: none; }
 
 .file-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
@@ -225,12 +250,13 @@ input#fileInput { display: none; }
   border-radius: 100px; padding: 6px 12px 6px 10px;
   font-family: var(--sans); font-size: 12px; color: #4de8a4;
 }
-.file-chip svg { width: 13px; height: 13px; stroke: #4de8a4; stroke-width: 2; fill: none; }
+.file-chip.parsed { background: rgba(26,107,255,0.1); border-color: rgba(26,107,255,0.3); color: #7fb4ff; }
+.file-chip svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; }
 .file-chip-remove {
-  background: none; border: none; cursor: pointer; color: rgba(77,232,164,0.5);
-  padding: 0; margin-left: 2px; line-height: 1; font-size: 14px; transition: color 0.15s;
+  background: none; border: none; cursor: pointer; color: currentColor; opacity: 0.5;
+  padding: 4px; margin: -4px -2px -4px 2px; line-height: 1; font-size: 15px; transition: opacity 0.15s;
 }
-.file-chip-remove:hover { color: #4de8a4; }
+.file-chip-remove:hover { opacity: 1; }
 
 .cta {
   display: inline-flex; align-items: center; gap: 10px;
@@ -245,24 +271,23 @@ input#fileInput { display: none; }
 .cta::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg,rgba(255,255,255,0.12),transparent); pointer-events: none; }
 .cta:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(26,107,255,0.55), 0 0 100px rgba(26,107,255,0.2), inset 0 1px 0 rgba(255,255,255,0.2); }
 .cta:active { transform: translateY(0); }
+.cta:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .cta:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
 .cta svg { width: 16px; height: 16px; stroke: white; stroke-width: 2; fill: none; flex-shrink: 0; }
 
-.cta-row { display: flex; align-items: center; gap: 16px; }
+.cta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .skip-link {
   font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-muted);
   background: none; border: none; cursor: pointer; text-decoration: underline;
   text-underline-offset: 3px; transition: color 0.15s;
 }
-.skip-link:hover { color: rgba(180,195,235,0.7); }
+.skip-link:hover { color: var(--text-primary); }
+.skip-link:focus-visible { outline: 2px solid var(--blue-glow); outline-offset: 2px; border-radius: 2px; }
 
-.status-msg {
-  font-family: var(--sans); font-size: 13px; margin-top: 10px;
-  min-height: 20px; line-height: 1.5;
-}
-.status-msg.error { color: #ff8a80; }
+.status-msg { font-family: var(--sans); font-size: 13px; margin-top: 10px; min-height: 20px; line-height: 1.5; }
+.status-msg.error   { color: #ff8a80; }
 .status-msg.success { color: #4de8a4; display: flex; align-items: center; gap: 6px; }
-.status-msg.info { color: var(--text-muted); }
+.status-msg.info    { color: var(--text-muted); }
 
 .loading-screen { text-align: center; }
 .loading-ring {
@@ -274,11 +299,11 @@ input#fileInput { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-label { font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -0.04em; font-size: 24px; color: var(--text-primary); margin-bottom: 8px; }
 .loading-sub { font-size: 14px; color: var(--text-muted); }
-.loading-steps { margin-top: 28px; display: flex; flex-direction: column; gap: 6px; max-width: 280px; margin-left: auto; margin-right: auto; }
+.loading-steps { margin-top: 28px; display: flex; flex-direction: column; gap: 6px; max-width: 300px; margin-left: auto; margin-right: auto; }
 .loading-step {
   display: flex; align-items: center; gap: 10px;
-  font-size: 13px; color: rgba(180,195,235,0.3);
-  padding: 8px 12px; border-radius: 8px; transition: all 0.3s;
+  font-size: 13px; color: var(--text-faint);
+  padding: 8px 12px; border-radius: 8px; transition: all 0.3s; text-align: left;
 }
 .loading-step.active { color: var(--white); background: rgba(26,107,255,0.08); font-weight: 500; }
 .loading-step.done { color: #4de8a4; }
@@ -287,31 +312,69 @@ input#fileInput { display: none; }
 .loading-step.done .step-dot { background: #4de8a4; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
+.review-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 28px; }
+.review-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+  padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.review-key { font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
+.review-val { font-size: 14px; color: var(--text-primary); font-weight: 500; text-align: right; }
+.review-edit {
+  font-size: 12px; color: var(--blue-glow); background: none; border: none; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px; margin-left: 10px; flex-shrink: 0;
+}
+.review-edit:hover { color: #fff; }
+
+.reg-note {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: rgba(26,107,255,0.06); border: 1px solid rgba(26,107,255,0.18);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 28px;
+}
+.reg-note svg { width: 18px; height: 18px; stroke: var(--blue-glow); stroke-width: 1.8; fill: none; flex-shrink: 0; margin-top: 1px; }
+.reg-note-text { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+.reg-note-text b { color: var(--text-primary); font-weight: 600; }
+
+/* Floating controls, lifted clear of the home indicator */
 .back-btn {
-  position: fixed; bottom: 36px; left: 40px; z-index: 100;
-  background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+  position: fixed; bottom: calc(36px + env(safe-area-inset-bottom)); left: max(40px, env(safe-area-inset-left)); z-index: 100;
+  background: rgba(2,4,8,0.6); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
   padding: 9px 18px; font-family: var(--sans); font-size: 13px;
   color: var(--text-muted); cursor: pointer; transition: all 0.25s;
   display: flex; align-items: center; gap: 6px;
 }
 .back-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text-primary); }
+.back-btn:focus-visible { outline: 2px solid var(--blue-glow); outline-offset: 2px; }
 .back-btn svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; }
 
 .key-hint {
-  position: fixed; bottom: 36px; right: 40px; z-index: 100;
-  font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(200,210,240,0.2);
+  position: fixed; bottom: calc(36px + env(safe-area-inset-bottom)); right: max(40px, env(safe-area-inset-right)); z-index: 100;
+  font-family: 'Inter', sans-serif; font-size: 12px; color: var(--text-faint);
   display: flex; align-items: center; gap: 6px;
 }
 .key { display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 7px; font-size: 11px; }
 
 @media (max-width: 600px) {
-  .chrome { padding: 20px 24px; }
-  .stage { padding: 72px 24px 72px; }
-  .back-btn { left: 24px; bottom: 28px; }
-  .key-hint { right: 24px; bottom: 28px; }
+  .chrome {
+    padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: 16px;
+    padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right));
+  }
+  .progress-wrap { min-width: 110px; }
+  .progress-label { display: none; }
+  .stage {
+    padding-top: calc(72px + env(safe-area-inset-top)); padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right));
+  }
+  .back-btn { left: max(20px, env(safe-area-inset-left)); bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .key-hint { display: none; }
   .choice-grid.cols-2 { grid-template-columns: 1fr; }
   .otp-digit { width: 44px; height: 56px; font-size: 24px; }
   .upload-zone { padding: 40px 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.12s !important; }
+  .loading-ring { animation: spin 0.9s linear infinite; }
 }
 </style>
 </head>
@@ -325,65 +388,79 @@ input#fileInput { display: none; }
     <div class="logo-mark">P</div>
     Payswitch
   </a>
-  <div class="progress-track" id="progressTrack"></div>
+  <div class="progress-wrap" aria-hidden="true">
+    <div class="progress-label" id="progressLabel">Step 1</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
 </header>
 
-<button class="back-btn" id="backBtn" onclick="goBack()" style="display:none">
+<button class="back-btn" id="backBtn" onclick="back()" style="display:none">
   <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
   Back
 </button>
 
-<div class="key-hint" id="keyHint">
+<div class="key-hint" id="keyHint" style="display:none">
   Press <span class="key">Enter ↵</span> to continue
 </div>
 
 <div class="stage">
 
-  <!-- S0: Upload -->
-  <div class="screen active" id="s0">
-    <div class="q-text">Upload your<br>merchant statements.</div>
-    <div class="q-sub">Last 3 months gives the clearest picture. You can also include monthly reports exported from your payment dashboard — Stripe, Square, Shopify Payments etc.</div>
-    <div class="file-chips" id="fileChips"></div>
-    <div class="upload-zone" id="uploadZone"
-         onclick="document.getElementById('fileInput').click()"
-         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
-      <div class="upload-icon">
-        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      </div>
-      <div class="upload-title">Drop files here</div>
-      <div class="upload-sub">PDF statements, images, or dashboard exports<br>Up to 10 files accepted</div>
-      <div class="upload-formats">PDF · PNG · JPG · HEIC · XLSX · CSV</div>
-    </div>
-    <input type="file" id="fileInput" accept=".pdf,image/*,.xlsx,.csv" multiple onchange="onFileSelect(event)">
-    <div class="cta-row">
-      <button class="cta" id="ctaS0" onclick="advance()" disabled>
-        Continue
-        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-      </button>
-      <button class="skip-link" onclick="skipUpload()">I don't have statements handy</button>
+  <!-- s5: Industry (first screen — soft, engaging opener) -->
+  <div class="screen active" id="s5">
+    <div class="q-text">What kind of<br>business are you?</div>
+    <div class="choice-grid cols-2">
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'industry','retail')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div><div class="choice-text"><div class="choice-label">Retail</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'industry','food')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></div><div class="choice-text"><div class="choice-label">Food & Hospitality</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'industry','ecommerce')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div><div class="choice-text"><div class="choice-label">eCommerce</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'industry','health')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="choice-text"><div class="choice-label">Healthcare</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'industry','professional')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></div><div class="choice-text"><div class="choice-label">Professional Services</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'industry','trades')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div><div class="choice-text"><div class="choice-label">Trades & Construction</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'industry','accommodation')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="choice-text"><div class="choice-label">Accommodation</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'industry','other')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="choice-text"><div class="choice-label">Other</div></div><div class="choice-check"></div></div>
     </div>
   </div>
 
-  <!-- S1: Name -->
+  <!-- s6: Channels (multi-select) -->
+  <div class="screen" id="s6">
+    <div class="q-text">How do you<br>take payments?</div>
+    <div class="q-sub">Select all that apply.</div>
+    <div class="choice-grid cols-1">
+      <div class="choice multi" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'channels','instore')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div><div class="choice-text"><div class="choice-label">In-store</div><div class="choice-sub">Card terminals, tap & pay</div></div><div class="choice-check"></div></div>
+      <div class="choice multi" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'channels','online')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><div class="choice-text"><div class="choice-label">Online</div><div class="choice-sub">Website, eCommerce</div></div><div class="choice-check"></div></div>
+      <div class="choice multi" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'channels','invoice')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div><div class="choice-text"><div class="choice-label">Invoices & payment links</div><div class="choice-sub">Send to customers to pay</div></div><div class="choice-check"></div></div>
+      <div class="choice multi" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'channels','recurring')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div><div class="choice-text"><div class="choice-label">Recurring / subscriptions</div><div class="choice-sub">Automatic billing</div></div><div class="choice-check"></div></div>
+      <div class="choice multi" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'channels','phone')" onkeydown="kbd(event)"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="choice-text"><div class="choice-label">Phone / MOTO</div><div class="choice-sub">Card not present, over the phone</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="cta-row" style="margin-top:8px">
+      <button class="cta" id="ctaS6" onclick="next()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- s1: Name -->
   <div class="screen" id="s1">
     <div class="q-text">What's your name?</div>
     <div class="q-input-wrap">
-      <input class="q-input" type="text" id="inp-firstname" placeholder="Jane Smith" autocomplete="name" oninput="validateS1()">
+      <label class="q-label" for="inp-name">Full name</label>
+      <input class="q-input" type="text" id="inp-name" placeholder="Jane Smith" autocomplete="name" aria-label="Your full name" oninput="validateName()">
     </div>
     <div class="cta-row">
-      <button class="cta" id="ctaS1" onclick="advance()" disabled>
+      <button class="cta" id="ctaS1" onclick="next()" disabled>
         Continue
         <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
       </button>
     </div>
   </div>
 
-  <!-- S2: Email -->
+  <!-- s2: Email -->
   <div class="screen" id="s2">
-    <div class="q-text">And your<br>email address?</div>
-    <div class="q-sub">This is where we'll send your completed report.</div>
+    <div class="q-text">Where should we<br>send your report?</div>
+    <div class="q-sub">We'll email your completed review here once it's verified.</div>
     <div class="q-input-wrap">
-      <input class="q-input" type="email" id="inp-email" placeholder="you@company.com" autocomplete="email" oninput="validateS2()">
+      <label class="q-label" for="inp-email">Email</label>
+      <input class="q-input" type="email" id="inp-email" placeholder="you@company.com" autocomplete="email" aria-label="Your email address" oninput="validateEmail()">
     </div>
     <div class="cta-row">
       <button class="cta" id="ctaS2" onclick="sendOtp()" disabled>
@@ -395,17 +472,17 @@ input#fileInput { display: none; }
     <div class="status-msg" id="statusS2"></div>
   </div>
 
-  <!-- S3: OTP -->
+  <!-- s3: OTP -->
   <div class="screen" id="s3">
     <div class="q-text">Check your<br>inbox.</div>
     <div class="q-sub" id="otpSub">We sent a 6-digit code to your email.</div>
     <div class="otp-digits" id="otpDigits">
-      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="0" onkeydown="otpKey(event,0)" oninput="otpInput(event,0)">
-      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="1" onkeydown="otpKey(event,1)" oninput="otpInput(event,1)">
-      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="2" onkeydown="otpKey(event,2)" oninput="otpInput(event,2)">
-      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="3" onkeydown="otpKey(event,3)" oninput="otpInput(event,3)">
-      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="4" onkeydown="otpKey(event,4)" oninput="otpInput(event,4)">
-      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" data-idx="5" onkeydown="otpKey(event,5)" oninput="otpInput(event,5)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" autocomplete="one-time-code" aria-label="Verification code digit 1" data-idx="0" onkeydown="otpKey(event,0)" oninput="otpInput(event,0)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" aria-label="Verification code digit 2" data-idx="1" onkeydown="otpKey(event,1)" oninput="otpInput(event,1)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" aria-label="Verification code digit 3" data-idx="2" onkeydown="otpKey(event,2)" oninput="otpInput(event,2)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" aria-label="Verification code digit 4" data-idx="3" onkeydown="otpKey(event,3)" oninput="otpInput(event,3)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" aria-label="Verification code digit 5" data-idx="4" onkeydown="otpKey(event,4)" oninput="otpInput(event,4)">
+      <input class="otp-digit" type="text" maxlength="1" inputmode="numeric" aria-label="Verification code digit 6" data-idx="5" onkeydown="otpKey(event,5)" oninput="otpInput(event,5)">
     </div>
     <div class="status-msg" id="statusS3"></div>
     <div class="cta-row" style="margin-top:24px">
@@ -417,180 +494,265 @@ input#fileInput { display: none; }
     </div>
   </div>
 
-  <!-- S4: Mobile -->
+  <!-- s4: Mobile -->
   <div class="screen" id="s4">
     <div class="q-text">What's your<br>mobile number?</div>
     <div class="q-input-wrap">
-      <input class="q-input" type="tel" id="inp-phone" placeholder="04XX XXX XXX" autocomplete="tel" oninput="validateS4()">
+      <label class="q-label" for="inp-phone">Mobile</label>
+      <input class="q-input" type="tel" id="inp-phone" placeholder="04XX XXX XXX" autocomplete="tel" aria-label="Your mobile number" oninput="validatePhone()">
     </div>
     <div class="cta-row">
-      <button class="cta" id="ctaS4" onclick="advance()" disabled>
+      <button class="cta" id="ctaS4" onclick="next()" disabled>
         Continue
         <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
       </button>
     </div>
   </div>
 
-  <!-- S5: Industry -->
-  <div class="screen" id="s5">
-    <div class="q-text">What kind of<br>business are you?</div>
-    <div class="choice-grid cols-2" id="industryGrid">
-      <div class="choice" onclick="selectChoice(this,'industry','retail')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div><div class="choice-text"><div class="choice-label">Retail</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'industry','food')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></div><div class="choice-text"><div class="choice-label">Food & Hospitality</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'industry','ecommerce')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div class="choice-text"><div class="choice-label">eCommerce</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'industry','health')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="choice-text"><div class="choice-label">Healthcare</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'industry','professional')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div class="choice-text"><div class="choice-label">Professional Services</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'industry','trades')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div><div class="choice-text"><div class="choice-label">Trades & Construction</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'industry','accommodation')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="choice-text"><div class="choice-label">Accommodation</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'industry','other')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="choice-text"><div class="choice-label">Other</div></div><div class="choice-check"></div></div>
+  <!-- s0: Upload (now after contact — the bigger ask, made once the lead is captured) -->
+  <div class="screen" id="s0">
+    <div class="q-text">Upload your<br>merchant statements.</div>
+    <div class="q-sub">The last 3 months gives the clearest picture. Dashboard exports work too — Stripe, Square, Shopify Payments and the like. <b>CSV and Excel files are read in full.</b></div>
+    <div class="file-chips" id="fileChips"></div>
+    <div class="upload-zone" id="uploadZone" role="button" tabindex="0" aria-label="Upload statements"
+         onclick="document.getElementById('fileInput').click()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('fileInput').click();}"
+         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="upload-title">Drop files here</div>
+      <div class="upload-sub">PDF statements, photos, or dashboard exports<br>Up to 10 files</div>
+      <div class="upload-formats">PDF · PNG · JPG · XLSX · CSV</div>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,application/pdf,image/png,image/jpeg" multiple onchange="onFileSelect(event)">
+    <div class="status-msg" id="statusS0"></div>
+    <div class="cta-row">
+      <button class="cta" id="ctaS0" onclick="next()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+      <button class="skip-link" onclick="skipUpload()">I don't have statements handy</button>
+    </div>
+  </div>
+
+  <!-- sProvider: Current provider(s) — multi-select + free text -->
+  <div class="screen" id="sProvider">
+    <div class="q-text">Who handles your<br>payments today?</div>
+    <div class="q-sub">Pick any that apply — plenty of businesses run different providers for in-store and online — and add anything not listed.</div>
+    <div class="choice-grid cols-2">
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'tyro')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Tyro</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'square')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Square</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'stripe')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Stripe</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'zeller')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Zeller</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'commbank')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">CommBank (Smart)</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'nab')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">NAB</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'westpac')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Westpac / EFTPOS</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'anz')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">ANZ Worldline</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'adyen')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Adyen</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'paypal')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">PayPal / Braintree</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'fatzebra')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Fat Zebra</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="q-input-wrap">
+      <label class="q-label" for="inp-provider-other">Other provider(s)</label>
+      <input class="q-input" style="font-size:22px" type="text" id="inp-provider-other" placeholder="Type any not listed…" aria-label="Other providers" oninput="onProviderOther()">
     </div>
     <div class="cta-row">
-      <button class="cta" id="ctaS5" onclick="advance()" disabled>
+      <button class="cta" id="ctaProvider" onclick="next()" disabled>
+        Continue
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+      <button class="skip-link" onclick="data.providers=[];data.providerOther='';next()">I'm not sure</button>
+    </div>
+  </div>
+
+  <!-- sPaymentTypes: Payment types accepted (multi-select) -->
+  <div class="screen" id="sPaymentTypes">
+    <div class="q-text">Which payment types<br>do you accept?</div>
+    <div class="q-sub">Select everything customers can currently pay with. This shows where you're covered — and where you might be missing a low-cost or in-demand option.</div>
+    <div class="choice-grid cols-2">
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','visa')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Visa</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','mastercard')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Mastercard</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','eftpos')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">eftpos</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','amex')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">American Express</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','unionpay')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">UnionPay</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','wallets')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Apple Pay / Google Pay</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','bnpl')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Buy Now Pay Later</div><div class="choice-sub">Afterpay, Zip</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','paypal')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">PayPal</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','payto')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">PayTo</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','bpay')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">BPAY</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','dd_bank')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Direct debit — bank account</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','dd_card')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Direct debit — card</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','eft')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">EFT / bank transfer</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="cta-row">
+      <button class="cta" id="ctaPaymentTypes" onclick="next()" disabled>
         Continue
         <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
       </button>
     </div>
   </div>
 
-  <!-- S6: Channels -->
-  <div class="screen" id="s6">
-    <div class="q-text">How do you<br>take payments?</div>
-    <div class="q-sub">Select all that apply.</div>
-    <div class="choice-grid cols-1" id="channelGrid">
-      <div class="choice multi" onclick="toggleChoice(this,'channels','instore')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div><div class="choice-text"><div class="choice-label">In-store</div><div class="choice-sub">Card terminals, tap & pay</div></div><div class="choice-check"></div></div>
-      <div class="choice multi" onclick="toggleChoice(this,'channels','online')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><div class="choice-text"><div class="choice-label">Online</div><div class="choice-sub">Website, eCommerce</div></div><div class="choice-check"></div></div>
-      <div class="choice multi" onclick="toggleChoice(this,'channels','invoice')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div><div class="choice-text"><div class="choice-label">Invoices & payment links</div><div class="choice-sub">Send to customers to pay</div></div><div class="choice-check"></div></div>
-      <div class="choice multi" onclick="toggleChoice(this,'channels','recurring')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div><div class="choice-text"><div class="choice-label">Recurring / subscriptions</div><div class="choice-sub">Automatic billing</div></div><div class="choice-check"></div></div>
-      <div class="choice multi" onclick="toggleChoice(this,'channels','phone')"><div class="choice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="choice-text"><div class="choice-label">Phone / MOTO</div><div class="choice-sub">Card not present, over the phone</div></div><div class="choice-check"></div></div>
-    </div>
-    <div class="cta-row" style="margin-top:8px">
-      <button class="cta" id="ctaS6" onclick="advanceFromChannels()" disabled>
-        Continue
-        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- S6b: eCommerce platform -->
+  <!-- s6b: eCommerce platform (online only) -->
   <div class="screen" id="s6b">
     <div class="q-text">Which eCommerce<br>platform do you use?</div>
     <div class="choice-grid cols-1">
-      <div class="choice" onclick="selectChoice(this,'ecomPlatform','shopify')"><div class="choice-text"><div class="choice-label">Shopify</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'ecomPlatform','woocommerce')"><div class="choice-text"><div class="choice-label">WooCommerce</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'ecomPlatform','magento')"><div class="choice-text"><div class="choice-label">Magento / Adobe Commerce</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'ecomPlatform','bigcommerce')"><div class="choice-text"><div class="choice-label">BigCommerce</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'ecomPlatform','custom')"><div class="choice-text"><div class="choice-label">Custom built</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'ecomPlatform','other')"><div class="choice-text"><div class="choice-label">Other</div></div><div class="choice-check"></div></div>
-    </div>
-    <div class="cta-row">
-      <button class="cta" id="ctaS6b" onclick="advanceFromEcom()" disabled>
-        Continue
-        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-      </button>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'ecomPlatform','shopify')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Shopify</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'ecomPlatform','woocommerce')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">WooCommerce</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'ecomPlatform','magento')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Magento / Adobe Commerce</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'ecomPlatform','bigcommerce')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">BigCommerce</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'ecomPlatform','custom')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Custom built</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'ecomPlatform','other')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Other</div></div><div class="choice-check"></div></div>
     </div>
   </div>
 
-  <!-- S6c: Terminal setup -->
+  <!-- s6c: Terminal setup (in-store only) -->
   <div class="screen" id="s6c">
     <div class="q-text">How are your<br>terminals set up?</div>
     <div class="choice-grid cols-1">
-      <div class="choice" onclick="selectChoice(this,'terminalSetup','standalone');advanceFromTerminal()"><div class="choice-text"><div class="choice-label">Standalone</div><div class="choice-sub">Terminals operate independently, not connected to a POS</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'terminalSetup','integrated');document.getElementById('ctaS6c').disabled=false"><div class="choice-text"><div class="choice-label">Integrated with a POS system</div><div class="choice-sub">Terminals connect directly to point-of-sale software</div></div><div class="choice-check"></div></div>
-    </div>
-    <div class="cta-row" style="margin-top:8px">
-      <button class="cta" id="ctaS6c" onclick="advanceFromTerminal()" disabled style="display:none">
-        Continue
-        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-      </button>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'terminalSetup','standalone')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Standalone</div><div class="choice-sub">Terminals run on their own, not linked to a POS</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'terminalSetup','integrated')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Integrated with a POS system</div><div class="choice-sub">Terminals connect directly to point-of-sale software</div></div><div class="choice-check"></div></div>
     </div>
   </div>
 
-  <!-- S6d: POS system -->
-  <div class="screen" id="s6d">
-    <div class="q-text">Which POS system<br>do you use?</div>
-    <div class="choice-grid cols-1">
-      <div class="choice" onclick="selectChoice(this,'posSystem','lightspeed')"><div class="choice-text"><div class="choice-label">Lightspeed</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'posSystem','square')"><div class="choice-text"><div class="choice-label">Square POS</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'posSystem','kounta')"><div class="choice-text"><div class="choice-label">Kounta / Lightspeed Restaurant</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'posSystem','vend')"><div class="choice-text"><div class="choice-label">Vend</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'posSystem','clover')"><div class="choice-text"><div class="choice-label">Clover</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'posSystem','revel')"><div class="choice-text"><div class="choice-label">Revel</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'posSystem','custom')"><div class="choice-text"><div class="choice-label">Custom / proprietary</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'posSystem','other')"><div class="choice-text"><div class="choice-label">Other</div></div><div class="choice-check"></div></div>
-    </div>
-    <div class="cta-row">
-      <button class="cta" id="ctaS6d" onclick="advance()" disabled>
-        Continue
-        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- S6e: LCR status -->
-  <div class="screen" id="s6e">
-    <div class="q-text">Is Least Cost Routing<br>turned on?</div>
-    <div class="choice-grid cols-1">
-      <div class="choice" onclick="selectChoice(this,'lcrStatus','on');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Yes, it's on</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'lcrStatus','off');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">No, it's off</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'lcrStatus','unknown');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">I don't know</div></div><div class="choice-check"></div></div>
-    </div>
-  </div>
-
-  <!-- S6f: Pricing model -->
+  <!-- s6f: Pricing model -->
   <div class="screen" id="s6f">
     <div class="q-text">What pricing model<br>are you on?</div>
     <div class="q-sub">Your statement will confirm this, but knowing upfront helps us frame the analysis correctly.</div>
     <div class="choice-grid cols-1">
-      <div class="choice" onclick="selectChoice(this,'pricingModel','blended');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Blended</div><div class="choice-sub">One flat rate for all card types</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'pricingModel','ic_plus');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Interchange Plus (IC+)</div><div class="choice-sub">Interchange cost plus a fixed processor margin</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'pricingModel','ic_plusplus');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Interchange++ (IC++)</div><div class="choice-sub">Every component itemised separately</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'pricingModel','unknown');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">I don't know</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'pricingModel','blended')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Blended</div><div class="choice-sub">One flat rate for all card types</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'pricingModel','ic_plus')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Interchange Plus (IC+)</div><div class="choice-sub">Interchange cost plus a fixed processor margin</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'pricingModel','ic_plusplus')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Interchange++ (IC++)</div><div class="choice-sub">Every component itemised separately</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'pricingModel','unknown')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">I don't know</div></div><div class="choice-check"></div></div>
     </div>
   </div>
 
-  <!-- S6g: Surcharge -->
+  <!-- s6e: LCR status (in-store only) -->
+  <div class="screen" id="s6e">
+    <div class="q-text">Is Least Cost Routing<br>turned on?</div>
+    <div class="q-sub">LCR sends contactless debit down the cheapest network. Many merchants have it switched off without realising.</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'lcrStatus','on')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Yes, it's on</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'lcrStatus','off')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">No, it's off</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'lcrStatus','unknown')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">I don't know</div></div><div class="choice-check"></div></div>
+    </div>
+  </div>
+
+  <!-- s6g: Surcharge (reframed around the Oct 2026 ban) -->
   <div class="screen" id="s6g">
-    <div class="q-text">Do you pass on a<br>surcharge to customers?</div>
-    <div class="q-sub">Some merchants recover card processing costs by adding a surcharge at checkout.</div>
+    <div class="q-text">Do you surcharge —<br>and are you ready<br>for the 2026 ban?</div>
+    <div class="reg-note">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div class="reg-note-text"><b>From 1 October 2026</b>, the RBA bans card surcharging on eftpos, Visa and Mastercard — alongside lower interchange caps. If you rely on surcharging today, your cost base is about to change.</div>
+    </div>
     <div class="choice-grid cols-1">
-      <div class="choice" onclick="selectChoice(this,'surcharge','yes_all');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Yes, on all card payments</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'surcharge','yes_some');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Yes, on some card types only</div><div class="choice-sub">e.g. credit cards but not debit</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'surcharge','no');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">No, I absorb the cost</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoice(this,'surcharge','considering');setTimeout(advance,350)"><div class="choice-text"><div class="choice-label">Not yet, but considering it</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','yes_planned')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">We surcharge, and have a plan for the ban</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','yes_noplan')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">We surcharge, but have no plan yet</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','no')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">We don't surcharge — we absorb the cost</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','unsure')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Not sure what this means for us</div></div><div class="choice-check"></div></div>
     </div>
   </div>
 
-  <!-- S7: Revenue -->
-  <div class="screen" id="s7">
-    <div class="q-text">What's your<br>annual revenue?</div>
+  <!-- sContract: Contract status -->
+  <div class="screen" id="sContract">
+    <div class="q-text">Are you locked into<br>a contract?</div>
+    <div class="q-sub">Lock-in terms, terminal rentals and exit fees all shape whether — and when — switching makes sense.</div>
     <div class="choice-grid cols-1">
-      <div class="choice" onclick="selectChoiceAuto(this,'revenue','under1m')"><div class="choice-text"><div class="choice-label">Under $1 million</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoiceAuto(this,'revenue','1to5m')"><div class="choice-text"><div class="choice-label">$1M – $5M</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoiceAuto(this,'revenue','5to20m')"><div class="choice-text"><div class="choice-label">$5M – $20M</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoiceAuto(this,'revenue','20to50m')"><div class="choice-text"><div class="choice-label">$20M – $50M</div></div><div class="choice-check"></div></div>
-      <div class="choice" onclick="selectChoiceAuto(this,'revenue','50mplus')"><div class="choice-text"><div class="choice-label">$50M+</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'contract','locked')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Yes — fixed-term contract</div><div class="choice-sub">May have early-exit fees</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'contract','rolling')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Month-to-month, no lock-in</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'contract','ending')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">In a contract that's ending soon</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'contract','unknown')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Not sure</div></div><div class="choice-check"></div></div>
+    </div>
+  </div>
+
+  <!-- sVolume: Monthly card volume -->
+  <div class="screen" id="sVolume">
+    <div class="q-text">Roughly how much<br>do you process on<br>cards each month?</div>
+    <div class="q-sub">Card turnover — this is what your savings actually scale on. A rough band is fine.</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'monthlyVolume','under10k')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Under $10k / month</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'monthlyVolume','10to50k')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$10k – $50k / month</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'monthlyVolume','50to250k')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$50k – $250k / month</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'monthlyVolume','250kto1m')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$250k – $1M / month</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'monthlyVolume','over1m')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$1M+ / month</div></div><div class="choice-check"></div></div>
+    </div>
+  </div>
+
+  <!-- sAtv: Average transaction value -->
+  <div class="screen" id="sAtv">
+    <div class="q-text">What's your average<br>transaction value?</div>
+    <div class="q-sub">The single most important number for fee modelling — a $4 tap and a $4,000 invoice have completely different optimal pricing.</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','under20')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Under $20</div><div class="choice-sub">Cafés, quick service, convenience</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','20to75')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$20 – $75</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','75to250')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$75 – $250</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','250to1000')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$250 – $1,000</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','over1000')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$1,000+</div><div class="choice-sub">Trades, professional services, B2B</div></div><div class="choice-check"></div></div>
+    </div>
+  </div>
+
+  <!-- sMix: Card mix -->
+  <div class="screen" id="sMix">
+    <div class="q-text">What's your<br>card mix?</div>
+    <div class="q-sub">Roughly what your customers pay with. This drives interchange, routing savings and surcharge economics.</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'cardMix','mostly_debit')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Mostly debit</div><div class="choice-sub">Eftpos, Visa/Mastercard debit</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'cardMix','mostly_credit')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Mostly credit</div><div class="choice-sub">Including rewards / premium cards</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'cardMix','even')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Fairly even split</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'cardMix','lots_intl')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">A lot of international / Amex</div><div class="choice-sub">Tourists, overseas customers</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'cardMix','unknown')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Not sure</div></div><div class="choice-check"></div></div>
+    </div>
+  </div>
+
+  <!-- sGoal: What would make this a win (multi-select + free text) -->
+  <div class="screen" id="sGoal">
+    <div class="q-text">What would make<br>this a win for you?</div>
+    <div class="q-sub">Pick everything that matters — and add anything we've missed. This tells us how to weight your report.</div>
+    <div class="choice-grid cols-1">
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleGoal(this,'lower_fees')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Lower my fees</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleGoal(this,'better_tech')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Better tech or features</div><div class="choice-sub">Faster settlement, integrations, reporting</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleGoal(this,'consolidate')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Consolidate providers</div><div class="choice-sub">One setup across all channels</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleGoal(this,'leave_provider')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Leave a provider I'm unhappy with</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleGoal(this,'benchmark')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Just want an honest benchmark</div></div><div class="choice-check"></div></div>
+    </div>
+    <div class="q-input-wrap">
+      <label class="q-label" for="inp-goal-other">Anything else</label>
+      <input class="q-input" style="font-size:22px" type="text" id="inp-goal-other" placeholder="In your own words…" aria-label="Anything else that would make this a win" oninput="onGoalOther()">
     </div>
     <div class="cta-row">
-      <button class="cta" id="ctaS7" onclick="advance()" disabled>
+      <button class="cta" id="ctaGoal" onclick="next()" disabled>
         Continue
         <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
       </button>
     </div>
   </div>
 
-  <!-- S8: Pain points -->
+  <!-- s8: Pain points -->
   <div class="screen" id="s8">
-    <div class="q-text">What's your biggest<br>frustration with your<br>current setup?</div>
-    <div class="q-sub">Or what made you start looking? Be as specific as you like — this shapes what we prioritise in your review.</div>
+    <div class="q-text">Anything else<br>frustrating you?</div>
+    <div class="q-sub">What made you start looking? Be as specific as you like — chargebacks, surprise fees, clunky hardware. This shapes what we prioritise.</div>
     <div class="q-input-wrap">
-      <textarea class="q-input" id="inp-pain" placeholder="e.g. Fees feel too high but I can't figure out why. I'm getting chargebacks I can't explain..." rows="3" style="resize:none;font-size:18px;line-height:1.55;padding-top:8px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';validateS8()"></textarea>
+      <textarea class="q-input" id="inp-pain" aria-label="Your biggest frustration" placeholder="e.g. Fees feel too high but I can't figure out why. I'm getting chargebacks I can't explain…" rows="3" style="resize:none;font-size:18px;line-height:1.55;padding-top:8px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';data.pain=this.value.trim()"></textarea>
     </div>
     <div class="cta-row">
-      <button class="cta" id="ctaS8" onclick="submitAll()">
+      <button class="cta" id="ctaS8" onclick="next()">
+        Review my answers
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </button>
+      <button class="skip-link" onclick="data.pain='';document.getElementById('inp-pain').value='';next()">Skip this question</button>
+    </div>
+  </div>
+
+  <!-- sReview: Summary before submit -->
+  <div class="screen" id="sReview">
+    <div class="q-text" style="font-size:clamp(28px,3.6vw,44px)">One last look<br>before we run it.</div>
+    <div class="q-sub">Check anything looks right. Tap edit to fix a detail.</div>
+    <div class="review-list" id="reviewList"></div>
+    <div class="cta-row">
+      <button class="cta" id="ctaReview" onclick="submitAll()">
         Submit for review
         <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
       </button>
-      <button class="skip-link" onclick="data.pain='';submitAll()">Skip this question</button>
     </div>
   </div>
 
@@ -599,7 +761,7 @@ input#fileInput { display: none; }
     <div class="loading-screen">
       <div class="loading-ring"></div>
       <div class="loading-label">Analysing your payments</div>
-      <div class="loading-sub">This takes about 30 seconds</div>
+      <div class="loading-sub">This usually takes under a minute</div>
       <div class="loading-steps">
         <div class="loading-step active" id="ls0"><div class="step-dot"></div>Reading your statements</div>
         <div class="loading-step" id="ls1"><div class="step-dot"></div>Extracting fee structure</div>
@@ -618,7 +780,7 @@ input#fileInput { display: none; }
         <div style="width:24px;height:24px;border-radius:50%;background:rgba(26,107,255,0.12);border:1px solid rgba(26,107,255,0.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#3A8AFF;flex-shrink:0;margin-top:2px">1</div>
         <div>
           <div style="font-size:14px;font-weight:600;color:#F0F4FF;margin-bottom:4px;font-family:'Manrope',sans-serif">AI analysis complete</div>
-          <div style="font-size:13px;color:rgba(200,210,240,0.55);line-height:1.6">Our payments AI has reviewed your statement and merchant profile, benchmarked your rates against current market data, and produced a tailored report specific to your payments setup.</div>
+          <div style="font-size:13px;color:var(--text-muted);line-height:1.6">Our payments AI has reviewed your statement and merchant profile, benchmarked your rates against current market data, and produced a report specific to your setup.</div>
         </div>
       </div>
       <div style="display:flex;gap:16px;align-items:flex-start;padding:16px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
@@ -626,14 +788,14 @@ input#fileInput { display: none; }
         <div>
           <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(186,117,23,0.1);border:1px solid rgba(186,117,23,0.25);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;color:#c98a20;margin-bottom:6px">⊕ Beta review</div>
           <div style="font-size:14px;font-weight:600;color:#F0F4FF;margin-bottom:4px;font-family:'Manrope',sans-serif">Human review in progress</div>
-          <div style="font-size:13px;color:rgba(200,210,240,0.55);line-height:1.6">As we're currently in beta, a payments specialist is reviewing the AI-generated report for accuracy before it reaches you. This ensures what you receive is verified, not just generated.</div>
+          <div style="font-size:13px;color:var(--text-muted);line-height:1.6">While we're in beta, a payments specialist checks the AI report for accuracy before it reaches you. So what you receive is verified, not just generated.</div>
         </div>
       </div>
       <div style="display:flex;gap:16px;align-items:flex-start;padding:16px 0">
         <div style="width:24px;height:24px;border-radius:50%;background:rgba(26,107,255,0.12);border:1px solid rgba(26,107,255,0.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#3A8AFF;flex-shrink:0;margin-top:2px">3</div>
         <div>
           <div style="font-size:14px;font-weight:600;color:#F0F4FF;margin-bottom:4px;font-family:'Manrope',sans-serif">Report delivered within 24 hours</div>
-          <div style="font-size:13px;color:rgba(200,210,240,0.55);line-height:1.6">Once reviewed, your report will be sent directly to your inbox. No action needed — we'll come to you.</div>
+          <div style="font-size:13px;color:var(--text-muted);line-height:1.6">Once reviewed, it lands in your inbox. No action needed — we'll come to you.</div>
         </div>
       </div>
     </div>
@@ -643,291 +805,414 @@ input#fileInput { display: none; }
 
 <script>
 const data = {
-  files: [], skippedUpload: false,
-  firstname: '', email: '', emailVerified: false,
-  phone: '', industry: '', channels: [], revenue: '',
-  ecomPlatform: '', terminalSetup: '', posSystem: '',
-  lcrStatus: '', pricingModel: '', surcharge: '', pain: ''
+  files: [], parsedTabular: [], skippedUpload: false,
+  name: '', email: '', emailVerified: false, skippedEmail: false,
+  phone: '', industry: '', channels: [],
+  ecomPlatform: '', terminalSetup: '',
+  providers: [], providerOther: '', paymentTypes: [],
+  monthlyVolume: '', atv: '', cardMix: '',
+  lcrStatus: '', pricingModel: '', surcharge: '', contract: '', goals: [], goalOther: '', pain: ''
 };
-let otp = { code: null, sent: false };
+let otp = { sent: false };
 
-const SCREENS = ['s0','s1','s2','s3','s4','s5','s6','s6b','s6c','s6d','s6e','s6f','s6g','s7','s8'];
-let current = 0;
+// ---- Navigation: path-aware, with a real history stack ----
+let currentId = 's5';
+let history = [];
+let busy = false;
+
+// The full ordered path the user will walk, given their current answers.
+function computePath() {
+  const p = ['s5','s6','s1','s2'];
+  if (!data.skippedEmail) p.push('s3');
+  p.push('s4','s0','sProvider','sPaymentTypes');
+  if (data.channels.includes('online'))  p.push('s6b');
+  if (data.channels.includes('instore')) p.push('s6c');
+  p.push('s6f');
+  if (data.channels.includes('instore')) p.push('s6e'); // LCR is terminal-side
+  p.push('s6g','sContract','sVolume','sAtv','sMix','sGoal','s8','sReview');
+  return p;
+}
 
 function renderProgress() {
-  const track = document.getElementById('progressTrack');
-  track.innerHTML = SCREENS.map((_, i) => {
-    const cls = i < current ? 'done' : i === current ? 'active' : '';
-    return `<div class="progress-pip ${cls}"></div>`;
-  }).join('');
+  const path = computePath();
+  const idx = Math.max(0, path.indexOf(currentId));
+  const pct = path.length > 1 ? (idx / (path.length - 1)) * 100 : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = 'Step ' + (idx + 1) + ' of ' + path.length;
 }
 
-function goTo(idx) {
-  const from = document.getElementById(SCREENS[current]);
-  const to   = document.getElementById(SCREENS[idx]);
+const KEYHINT_SCREENS = ['s1','s2','s3','s4']; // only single-text-input screens use Enter
+function updateChrome() {
+  document.getElementById('backBtn').style.display = history.length ? 'flex' : 'none';
+  document.getElementById('keyHint').style.display = KEYHINT_SCREENS.includes(currentId) ? 'flex' : 'none';
+}
+
+function show(id, reverse) {
+  if (busy || id === currentId) return;
+  const from = document.getElementById(currentId);
+  const to   = document.getElementById(id);
   if (!to) return;
+  busy = true;
+
+  to.scrollTop = 0;
+  to.classList.remove('active','exit','exit-back','enter-back');
+  if (reverse) to.classList.add('enter-back');
+  void to.offsetWidth; // reflow so the enter transform applies
+
   from.classList.remove('active');
-  from.classList.add('exit');
-  setTimeout(() => from.classList.remove('exit'), 500);
-  current = idx;
+  from.classList.add(reverse ? 'exit-back' : 'exit');
+  to.classList.remove('enter-back');
   to.classList.add('active');
+
+  currentId = id;
   renderProgress();
-  document.getElementById('backBtn').style.display = idx > 0 ? 'flex' : 'none';
-  document.getElementById('keyHint').style.display = ['s0','s5','s6','s7','sLoading','sConfirm'].includes(SCREENS[idx]) ? 'none' : 'flex';
+  updateChrome();
+  if (id === 'sReview') renderReview();
+
   setTimeout(() => {
+    from.classList.remove('exit','exit-back');
+    busy = false;
     const inp = to.querySelector('.q-input, .otp-digit');
     if (inp) inp.focus();
-  }, 450);
+  }, 480);
 }
 
-function advance() { goTo(current + 1); }
-function goBack()   { if (current > 0) goTo(current - 1); }
+function next() {
+  if (busy) return;
+  const path = computePath();
+  const idx = path.indexOf(currentId);
+  if (idx === -1 || idx >= path.length - 1) return;
+  history.push(currentId);
+  show(path[idx + 1]);
+}
+function back() {
+  if (busy || !history.length) return;
+  show(history.pop(), true);
+}
+function goEdit(id) {            // jump from review to a specific screen
+  if (busy) return;
+  history.push(currentId);
+  show(id);
+}
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   if (e.target.tagName === 'TEXTAREA') return;
-  const btn = document.querySelector(`#${SCREENS[current]} .cta:not(:disabled)`);
+  if (!KEYHINT_SCREENS.includes(currentId) && currentId !== 'sReview') return;
+  const btn = document.querySelector('#' + currentId + ' .cta:not(:disabled)');
   if (btn) btn.click();
 });
 
-function onDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag-over'); }
-function onDragLeave()  { document.getElementById('uploadZone').classList.remove('drag-over'); }
-function onDrop(e)      { e.preventDefault(); document.getElementById('uploadZone').classList.remove('drag-over'); Array.from(e.dataTransfer.files).forEach(addFile); }
-function onFileSelect(e){ Array.from(e.target.files).forEach(addFile); e.target.value = ''; }
+// ---- Choice helpers ----
+function selectSingle(el, key, val) {
+  el.closest('.choice-grid').querySelectorAll('.choice').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  data[key] = val;
+}
+function pick(el, key, val) {            // single-select → auto-advance
+  selectSingle(el, key, val);
+  setTimeout(next, 300);
+}
+function toggle(el, key, val) {          // multi-select → button
+  el.classList.toggle('selected');
+  const on = el.classList.contains('selected');
+  el.setAttribute('aria-checked', on ? 'true' : 'false');
+  if (on) { if (!data[key].includes(val)) data[key].push(val); }
+  else    { data[key] = data[key].filter(v => v !== val); }
+  const cta = el.closest('.screen').querySelector('.cta');
+  if (cta) cta.disabled = data[key].length === 0;
+}
+function kbd(e) { // keyboard activation for role=button/checkbox choices
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); }
+}
+
+// Provider is multi-select with a free-text addition, so the CTA also
+// considers the typed value — hence its own toggle + cta updater.
+function toggleProvider(el, val) {
+  el.classList.toggle('selected');
+  const on = el.classList.contains('selected');
+  el.setAttribute('aria-checked', on ? 'true' : 'false');
+  if (on) { if (!data.providers.includes(val)) data.providers.push(val); }
+  else    { data.providers = data.providers.filter(v => v !== val); }
+  updateProviderCta();
+}
+function onProviderOther() {
+  data.providerOther = document.getElementById('inp-provider-other').value.trim();
+  updateProviderCta();
+}
+function updateProviderCta() {
+  document.getElementById('ctaProvider').disabled = !(data.providers.length || data.providerOther);
+}
+
+// "What would make this a win" is also multi-select + free text.
+function toggleGoal(el, val) {
+  el.classList.toggle('selected');
+  const on = el.classList.contains('selected');
+  el.setAttribute('aria-checked', on ? 'true' : 'false');
+  if (on) { if (!data.goals.includes(val)) data.goals.push(val); }
+  else    { data.goals = data.goals.filter(v => v !== val); }
+  updateGoalCta();
+}
+function onGoalOther() {
+  data.goalOther = document.getElementById('inp-goal-other').value.trim();
+  updateGoalCta();
+}
+function updateGoalCta() {
+  document.getElementById('ctaGoal').disabled = !(data.goals.length || data.goalOther);
+}
+
+// ---- Text validators ----
+function validateName()  { data.name  = document.getElementById('inp-name').value.trim();  document.getElementById('ctaS1').disabled = data.name.length < 2; }
+function validateEmail() { data.email = document.getElementById('inp-email').value.trim(); document.getElementById('ctaS2').disabled = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email); }
+function validatePhone() { data.phone = document.getElementById('inp-phone').value.trim(); document.getElementById('ctaS4').disabled = data.phone.replace(/\D/g,'').length < 8; }
+function firstName() { return (data.name.split(' ')[0] || data.name); }
+
+// ---- File upload (with CSV/XLSX parsing + HEIC guard) ----
+function onDragOver(e){ e.preventDefault(); document.getElementById('uploadZone').classList.add('drag-over'); }
+function onDragLeave(){ document.getElementById('uploadZone').classList.remove('drag-over'); }
+function onDrop(e){ e.preventDefault(); document.getElementById('uploadZone').classList.remove('drag-over'); Array.from(e.dataTransfer.files).forEach(addFile); }
+function onFileSelect(e){ Array.from(e.target.files).forEach(addFile); e.target.value=''; }
+
+function uploadError(msg){ const s=document.getElementById('statusS0'); s.className='status-msg error'; s.textContent=msg; }
+function uploadClear(){ const s=document.getElementById('statusS0'); s.className='status-msg'; s.textContent=''; }
 
 function addFile(f) {
-  if (data.files.length >= 10) return;
-  if (data.files.find(x => x.name === f.name)) return;
+  uploadClear();
+  if (data.files.length >= 10) { uploadError('That\'s the 10-file limit — remove one to add another.'); return; }
+  if (data.files.some(x => x.name === f.name)) return;
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'heic' || ext === 'heif' || /heic|heif/.test(f.type)) {
+    uploadError('HEIC images aren\'t supported. On iPhone, take a screenshot of the statement or save it as JPG, or upload the PDF.');
+    return;
+  }
+  const isTabular = (ext === 'csv' || ext === 'xlsx' || ext === 'xls');
   data.files.push(f);
+  if (isTabular) parseTabular(f);
   renderChips();
   document.getElementById('ctaS0').disabled = false;
 }
 function removeFile(i) {
-  data.files.splice(i, 1);
+  const removed = data.files.splice(i, 1)[0];
+  if (removed) data.parsedTabular = data.parsedTabular.filter(t => t.name !== removed.name);
   renderChips();
-  if (data.files.length === 0) document.getElementById('ctaS0').disabled = true;
+  if (!data.files.length) document.getElementById('ctaS0').disabled = true;
+}
+function parseTabular(f) {
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      if (typeof XLSX === 'undefined') throw new Error('no-lib');
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      let text = '';
+      wb.SheetNames.forEach(n => { text += '\n--- Sheet: ' + n + ' ---\n' + XLSX.utils.sheet_to_csv(wb.Sheets[n]); });
+      data.parsedTabular.push({ name: f.name, text: text.slice(0, 60000) });
+      markChipParsed(f.name);
+    } catch (err) {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      if (ext === 'csv') {
+        const tr = new FileReader();
+        tr.onload = ev => { data.parsedTabular.push({ name: f.name, text: String(ev.target.result).slice(0, 60000) }); markChipParsed(f.name); };
+        tr.readAsText(f);
+      }
+    }
+  };
+  r.readAsArrayBuffer(f);
+}
+function markChipParsed(name){
+  document.querySelectorAll('#fileChips .file-chip').forEach(c => { if (c.dataset.name === name) c.classList.add('parsed'); });
 }
 function renderChips() {
-  document.getElementById('fileChips').innerHTML = data.files.map((f, i) =>
-    `<div class="file-chip">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      ${f.name.length > 28 ? f.name.slice(0,26)+'…' : f.name}
-      <button class="file-chip-remove" onclick="removeFile(${i})">×</button>
-    </div>`
-  ).join('');
+  document.getElementById('fileChips').innerHTML = data.files.map((f, i) => {
+    const parsed = data.parsedTabular.some(t => t.name === f.name);
+    const label = f.name.length > 28 ? f.name.slice(0,26)+'…' : f.name;
+    return '<div class="file-chip' + (parsed ? ' parsed' : '') + '" data-name="' + f.name.replace(/"/g,'&quot;') + '">' +
+      '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+      label +
+      '<button class="file-chip-remove" aria-label="Remove file" onclick="removeFile(' + i + ')">×</button></div>';
+  }).join('');
 }
-function skipUpload() { data.skippedUpload = true; advance(); }
+function skipUpload(){ data.skippedUpload = true; next(); }
 
-function validateS1() {
-  data.firstname = document.getElementById('inp-firstname').value.trim();
-  document.getElementById('ctaS1').disabled = data.firstname.length < 2;
-}
-
-function validateS2() {
-  data.email = document.getElementById('inp-email').value.trim();
-  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email);
-  document.getElementById('ctaS2').disabled = !valid;
-}
-
-function skipEmail() {
-  data.emailVerified = false;
-  const from = document.getElementById(SCREENS[current]);
-  from.classList.remove('active');
-  from.classList.add('exit');
-  setTimeout(() => from.classList.remove('exit'), 500);
-  current = 4;
-  document.getElementById(SCREENS[current]).classList.add('active');
-  renderProgress();
-  document.getElementById('backBtn').style.display = 'flex';
-  document.getElementById('keyHint').style.display = 'flex';
-  setTimeout(() => {
-    const inp = document.getElementById(SCREENS[current]).querySelector('.q-input');
-    if (inp) inp.focus();
-  }, 450);
-}
+// ---- Email + OTP ----
+function skipEmail() { data.skippedEmail = true; data.emailVerified = false; next(); }
 
 async function sendOtp(isResend) {
   const btn = document.getElementById('ctaS2');
   const status = document.getElementById('statusS2');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  status.className = 'status-msg info';
-  status.textContent = '';
+  btn.disabled = true; btn.textContent = 'Sending…';
+  status.className = 'status-msg info'; status.textContent = '';
   try {
     const res = await fetch('/api/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: data.email, firstName: data.firstname })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email, firstName: firstName() })
     });
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || 'Failed to send');
     otp.sent = true;
-    document.getElementById('otpSub').textContent = `We sent a 6-digit code to ${data.email}.`;
-    advance();
-    btn.textContent = 'Send verification code';
-    btn.disabled = false;
-  } catch(err) {
+    document.getElementById('otpSub').textContent = 'We sent a 6-digit code to ' + data.email + '.';
+    btn.textContent = 'Send verification code'; btn.disabled = false;
+    if (!isResend) next();
+  } catch (err) {
     status.className = 'status-msg error';
-    status.textContent = 'Could not send code: ' + err.message;
-    btn.textContent = 'Send verification code';
-    btn.disabled = false;
+    status.textContent = 'We couldn\'t send the code: ' + err.message + '. Check the address and try again.';
+    btn.textContent = 'Send verification code'; btn.disabled = false;
   }
 }
-
 function otpKey(e, idx) {
   const digits = document.querySelectorAll('.otp-digit');
-  if (e.key === 'Backspace') {
-    if (!digits[idx].value && idx > 0) { digits[idx-1].value = ''; digits[idx-1].focus(); }
-    validateOtp();
-  }
-  if (e.key === 'ArrowLeft' && idx > 0) digits[idx-1].focus();
+  if (e.key === 'Backspace') { if (!digits[idx].value && idx > 0) { digits[idx-1].value=''; digits[idx-1].classList.remove('filled'); digits[idx-1].focus(); } validateOtp(); }
+  if (e.key === 'ArrowLeft'  && idx > 0) digits[idx-1].focus();
   if (e.key === 'ArrowRight' && idx < 5) digits[idx+1].focus();
 }
 function otpInput(e, idx) {
   const digits = document.querySelectorAll('.otp-digit');
   const val = e.target.value.replace(/[^0-9]/g,'');
-  e.target.value = val.slice(-1);
-  if (val && idx < 5) digits[idx+1].focus();
   if (val.length > 1) {
-    val.split('').slice(0,6).forEach((c, i) => { if (digits[i]) digits[i].value = c; });
+    val.split('').slice(0,6).forEach((c,i)=>{ if (digits[i]){ digits[i].value=c; digits[i].classList.add('filled'); } });
     digits[Math.min(5, val.length-1)].focus();
+  } else {
+    e.target.value = val.slice(-1);
+    if (val && idx < 5) digits[idx+1].focus();
   }
-  digits[idx].classList.toggle('filled', !!e.target.value);
+  digits[idx].classList.toggle('filled', !!digits[idx].value);
   validateOtp();
 }
 function validateOtp() {
-  const code = Array.from(document.querySelectorAll('.otp-digit')).map(d => d.value).join('');
+  const code = Array.from(document.querySelectorAll('.otp-digit')).map(d=>d.value).join('');
   document.getElementById('ctaS3').disabled = code.length < 6;
 }
 async function verifyOtp() {
-  const code = Array.from(document.querySelectorAll('.otp-digit')).map(d => d.value).join('');
+  const code = Array.from(document.querySelectorAll('.otp-digit')).map(d=>d.value).join('');
   const btn = document.getElementById('ctaS3');
   const status = document.getElementById('statusS3');
-  btn.disabled = true; btn.textContent = 'Verifying…';
-  status.textContent = '';
+  btn.disabled = true; btn.textContent = 'Verifying…'; status.textContent = '';
   try {
     const res = await fetch('/api/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: data.email, verify: code })
     });
     const d = await res.json();
     if (!res.ok || !d.valid) {
-      status.className = 'status-msg error';
-      status.textContent = 'Incorrect code — please try again.';
-      btn.disabled = false; btn.textContent = 'Verify code';
-      return;
+      status.className = 'status-msg error'; status.textContent = 'That code didn\'t match. Check it and try again.';
+      btn.disabled = false; btn.textContent = 'Verify code'; return;
     }
     data.emailVerified = true;
     status.className = 'status-msg success';
     status.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email verified';
-    setTimeout(advance, 600);
-  } catch(err) {
-    status.className = 'status-msg error';
-    status.textContent = 'Verification failed. Try again.';
+    setTimeout(next, 600);
+  } catch (err) {
+    status.className = 'status-msg error'; status.textContent = 'Verification failed. Please try again.';
     btn.disabled = false; btn.textContent = 'Verify code';
   }
 }
 
-function validateS4() {
-  data.phone = document.getElementById('inp-phone').value.trim();
-  document.getElementById('ctaS4').disabled = data.phone.length < 8;
+// ---- Review summary ----
+const LABELS = {
+  industry:{retail:'Retail',food:'Food & Hospitality',ecommerce:'eCommerce',health:'Healthcare',professional:'Professional Services',trades:'Trades & Construction',accommodation:'Accommodation',other:'Other'},
+  provider:{tyro:'Tyro',square:'Square',stripe:'Stripe',zeller:'Zeller',commbank:'CommBank (Smart)',nab:'NAB',westpac:'Westpac / EFTPOS',anz:'ANZ Worldline',adyen:'Adyen',paypal:'PayPal / Braintree',fatzebra:'Fat Zebra'},
+  paymentTypes:{visa:'Visa',mastercard:'Mastercard',eftpos:'eftpos',amex:'American Express',unionpay:'UnionPay',wallets:'Apple/Google Pay',bnpl:'Buy Now Pay Later',paypal:'PayPal',payto:'PayTo',bpay:'BPAY',dd_bank:'Direct debit (bank)',dd_card:'Direct debit (card)',eft:'EFT / bank transfer'},
+  monthlyVolume:{under10k:'Under $10k/mo','10to50k':'$10k–$50k/mo','50to250k':'$50k–$250k/mo','250kto1m':'$250k–$1M/mo',over1m:'$1M+/mo'},
+  atv:{under20:'Under $20','20to75':'$20–$75','75to250':'$75–$250','250to1000':'$250–$1,000',over1000:'$1,000+'},
+  cardMix:{mostly_debit:'Mostly debit',mostly_credit:'Mostly credit',even:'Even split',lots_intl:'Lots of intl/Amex',unknown:'Not sure'},
+  pricingModel:{blended:'Blended',ic_plus:'Interchange Plus',ic_plusplus:'Interchange++',unknown:'Not sure'},
+  lcrStatus:{on:'On',off:'Off',unknown:'Not sure'},
+  surcharge:{yes_planned:'Yes — has a plan',yes_noplan:'Yes — no plan yet',no:'No, absorbs it',unsure:'Not sure'},
+  contract:{locked:'Fixed-term',rolling:'Month-to-month',ending:'Ending soon',unknown:'Not sure'},
+  goal:{lower_fees:'Lower fees',better_tech:'Better tech',consolidate:'Consolidate',leave_provider:'Leave provider',benchmark:'Honest benchmark'}
+};
+function lbl(key, val){ return (LABELS[key] && LABELS[key][val]) || val; }
+function providerSummary() {
+  const names = data.providers.map(p => lbl('provider', p));
+  if (data.providerOther) names.push(data.providerOther);
+  return names.join(', ');
+}
+function goalSummary() {
+  const names = data.goals.map(g => lbl('goal', g));
+  if (data.goalOther) names.push(data.goalOther);
+  return names.join(', ');
+}
+function renderReview() {
+  const channelNames = {instore:'In-store',online:'Online',invoice:'Invoices',recurring:'Recurring',phone:'Phone/MOTO'};
+  const rows = [];
+  const add = (label, value, editId) => { if (value) rows.push({label, value, editId}); };
+  add('Statements', data.skippedUpload ? 'None uploaded' : (data.files.length + ' file' + (data.files.length===1?'':'s')), 's0');
+  add('Name', data.name, 's1');
+  add('Email', data.email + (data.emailVerified ? ' ✓' : ''), 's2');
+  add('Industry', lbl('industry', data.industry), 's5');
+  add('Channels', data.channels.map(c=>channelNames[c]).join(', '), 's6');
+  add('Current provider(s)', providerSummary(), 'sProvider');
+  add('Accepts', data.paymentTypes.map(t=>lbl('paymentTypes',t)).join(', '), 'sPaymentTypes');
+  add('Pricing model', lbl('pricingModel', data.pricingModel), 's6f');
+  if (data.lcrStatus) add('LCR', lbl('lcrStatus', data.lcrStatus), 's6e');
+  add('Surcharging', lbl('surcharge', data.surcharge), 's6g');
+  add('Contract', lbl('contract', data.contract), 'sContract');
+  add('Monthly card volume', lbl('monthlyVolume', data.monthlyVolume), 'sVolume');
+  add('Avg transaction', lbl('atv', data.atv), 'sAtv');
+  add('Card mix', lbl('cardMix', data.cardMix), 'sMix');
+  add('Goal', goalSummary(), 'sGoal');
+  document.getElementById('reviewList').innerHTML = rows.map(r =>
+    '<div class="review-row"><span class="review-key">' + r.label + '</span>' +
+    '<span style="display:flex;align-items:baseline"><span class="review-val">' + r.value + '</span>' +
+    '<button class="review-edit" onclick="goEdit(\'' + r.editId + '\')">edit</button></span></div>'
+  ).join('');
 }
 
-function selectChoice(el, key, val) {
-  el.closest('.choice-grid, .screen').querySelectorAll('.choice:not(.multi)').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  data[key] = val;
-  const cta = el.closest('.screen').querySelector('.cta');
-  if (cta) cta.disabled = false;
-}
-
-function selectChoiceAuto(el, key, val) {
-  selectChoice(el, key, val);
-  setTimeout(advance, 350);
-}
-
-function toggleChoice(el, key, val) {
-  el.classList.toggle('selected');
-  if (el.classList.contains('selected')) {
-    if (!data[key].includes(val)) data[key].push(val);
-  } else {
-    data[key] = data[key].filter(v => v !== val);
-  }
-  const cta = el.closest('.screen').querySelector('.cta');
-  if (cta) cta.disabled = data[key].length === 0;
-}
-
-function advanceFromChannels() {
-  if (data.channels.includes('online')) {
-    goTo(SCREENS.indexOf('s6b'));
-  } else if (data.channels.includes('instore')) {
-    goTo(SCREENS.indexOf('s6c'));
-  } else {
-    goTo(SCREENS.indexOf('s6e'));
-  }
-}
-
-function advanceFromEcom() {
-  if (data.channels.includes('instore')) {
-    goTo(SCREENS.indexOf('s6c'));
-  } else {
-    goTo(SCREENS.indexOf('s6e'));
-  }
-}
-
-function advanceFromTerminal() {
-  if (data.terminalSetup === 'integrated') {
-    goTo(SCREENS.indexOf('s6d'));
-  } else {
-    goTo(SCREENS.indexOf('s6e'));
-  }
-}
-
-function validateS8() {
-  data.pain = document.getElementById('inp-pain').value.trim();
-}
-
+// ---- Submit ----
 async function submitAll() {
-  data.pain = document.getElementById('inp-pain').value.trim();
-  const from = document.getElementById(SCREENS[current]);
-  from.classList.remove('active');
   const loading = document.getElementById('sLoading');
+  document.getElementById('sReview').classList.remove('active');
   loading.classList.add('active');
   document.getElementById('backBtn').style.display = 'none';
   document.getElementById('keyHint').style.display = 'none';
+  document.getElementById('progressFill').style.width = '100%';
 
-  const lsIds = ['ls0','ls1','ls2','ls3'];
-  let lsIdx = 0;
-  const lsIv = setInterval(() => {
-    document.getElementById(lsIds[lsIdx]).className = 'loading-step done';
-    lsIdx++;
-    if (lsIdx < lsIds.length) document.getElementById(lsIds[lsIdx]).className = 'loading-step active';
-  }, 3000);
+  const steps = ['ls0','ls1','ls2','ls3'];
+  let si = 0;
+  document.getElementById(steps[0]).className = 'loading-step active';
+  const iv = setInterval(() => {
+    if (si < 3) {
+      document.getElementById(steps[si]).className = 'loading-step done';
+      si++;
+      document.getElementById(steps[si]).className = 'loading-step active';
+      if (si === 3) clearInterval(iv); // leave "Writing your report" active until the API truly returns
+    }
+  }, 4000);
+
+  const providerStr = providerSummary();
+  const goalStr = goalSummary();
+  const paymentTypeStr = data.paymentTypes.map(t => LABELS.paymentTypes[t] || t).join(', ');
 
   const programContext = [
-    `Name: ${data.firstname}`,
-    `Email: ${data.email}`,
-    `Phone: ${data.phone}`,
-    data.industry        ? `Industry: ${data.industry}` : '',
-    data.channels.length ? `Payment channels: ${data.channels.join(', ')}` : '',
-    data.ecomPlatform    ? `eCommerce platform: ${data.ecomPlatform}` : '',
-    data.terminalSetup   ? `Terminal setup: ${data.terminalSetup}` : '',
-    data.posSystem       ? `POS system: ${data.posSystem}` : '',
-    data.lcrStatus       ? `LCR status: ${data.lcrStatus}` : '',
-    data.pricingModel    ? `Current pricing model: ${data.pricingModel}` : '',
-    data.surcharge       ? `Surcharge passed to customers: ${data.surcharge}` : '',
-    data.revenue         ? `Annual revenue: ${data.revenue}` : '',
-    data.pain            ? `Biggest frustration: ${data.pain}` : '',
-    data.skippedUpload   ? 'Statements: not uploaded' : `Statements uploaded: ${data.files.length} file(s)`,
+    'Name: ' + data.name,
+    'Email: ' + data.email + (data.emailVerified ? ' (verified)' : data.skippedEmail ? ' (skipped)' : ''),
+    'Phone: ' + data.phone,
+    data.industry        ? 'Industry: ' + data.industry : '',
+    data.channels.length ? 'Payment channels: ' + data.channels.join(', ') : '',
+    data.ecomPlatform    ? 'eCommerce platform: ' + data.ecomPlatform : '',
+    data.terminalSetup   ? 'Terminal setup: ' + data.terminalSetup : '',
+    providerStr          ? 'Current provider(s): ' + providerStr : '',
+    paymentTypeStr       ? 'Accepted payment types: ' + paymentTypeStr : '',
+    data.monthlyVolume   ? 'Monthly card volume: ' + (LABELS.monthlyVolume[data.monthlyVolume]||data.monthlyVolume) : '',
+    data.atv             ? 'Average transaction value: ' + (LABELS.atv[data.atv]||data.atv) : '',
+    data.cardMix         ? 'Card mix: ' + (LABELS.cardMix[data.cardMix]||data.cardMix) : '',
+    data.lcrStatus       ? 'LCR status: ' + data.lcrStatus : '',
+    data.pricingModel    ? 'Current pricing model: ' + data.pricingModel : '',
+    data.surcharge       ? 'Surcharging / 2026-readiness: ' + (LABELS.surcharge[data.surcharge]||data.surcharge) : '',
+    data.contract        ? 'Contract status: ' + (LABELS.contract[data.contract]||data.contract) : '',
+    goalStr              ? 'Primary goal(s): ' + goalStr : '',
+    data.pain            ? 'Biggest frustration: ' + data.pain : '',
+    data.skippedUpload   ? 'Statements: not uploaded' : 'Statements uploaded: ' + data.files.length + ' file(s)' +
+                            (data.parsedTabular.length ? ' (' + data.parsedTabular.length + ' spreadsheet export(s) parsed inline)' : '')
   ].filter(Boolean).join('\n');
 
   const system = `You are a senior payments consultant based in Australia with 15+ years analysing merchant statements and payment infrastructure. Analyse the provided information and return ONLY valid JSON with no markdown, no backticks, no preamble.
 
-IMPORTANT: Reference the merchant's specific industry, channels, and pain points in your analysis. All recommendations must be tailored to their actual situation.
+AUSTRALIAN REGULATORY CONTEXT (current, must be applied): From 1 October 2026 the RBA bans card surcharging on eftpos, Visa and Mastercard. At the same time interchange caps fall — domestic consumer credit from 0.8% to 0.3% and debit from 0.2% to 0.16% — with a 1% cap on foreign-card interchange from 1 April 2027, plus new provider fee-transparency rules. Model the merchant's cost base AFTER these changes: if they rely on surcharging, flag the transition risk; treat the interchange cuts and transparency rules as concrete reasons to review now. Put the merchant-specific implication in the "regulatoryImpact" field.
+
+IMPORTANT: Reference the merchant's specific current provider(s), industry, channels, accepted payment types, average transaction value, monthly card volume, card mix, contract status, stated goal and pain points. Every recommendation must be tailored to their actual situation, never generic. If statements (PDFs, images, or parsed spreadsheet exports) are provided, extract real figures from them; otherwise estimate from the profile and say so.
 
 Return this exact structure:
-{"provider":"string","period":"string","volume":null,"transactions":null,"totalFees":null,"effectiveRate":null,"perTransactionFee":null,"monthlyFee":null,"terminalFees":null,"pricingModel":"blended|ic_plus|ic_plusplus|unknown","lcrStatus":"on|off|unknown","feeBreakdown":[{"label":"string","amount":0,"note":null}],"alerts":[{"type":"warn|good|info","heading":"string","body":"string"}],"executiveSummary":"string","pricingModelAnalysis":"string","savingsOpportunity":"string","lcrAnalysis":"string","keyRecommendation":"string","nextSteps":["step 1","step 2","step 3"],"benchmarkComment":"string","stackAssessment":"string","stackItems":[{"label":"string","value":"string","status":"ok|warn|gap"}]}`;
+{"provider":"string","currentProvider":"string","period":"string","volume":null,"transactions":null,"totalFees":null,"effectiveRate":null,"perTransactionFee":null,"monthlyFee":null,"terminalFees":null,"averageTxnValue":"string","monthlyCardVolume":"string","cardMix":"string","acceptedPaymentTypes":"string","pricingModel":"blended|ic_plus|ic_plusplus|unknown","lcrStatus":"on|off|unknown","contractStatus":"string","primaryGoal":"string","surchargeReadiness":"string","feeBreakdown":[{"label":"string","amount":0,"note":null}],"alerts":[{"type":"warn|good|info","heading":"string","body":"string"}],"executiveSummary":"string","pricingModelAnalysis":"string","savingsOpportunity":"string","lcrAnalysis":"string","regulatoryImpact":"string","acceptanceGaps":"string","keyRecommendation":"string","nextSteps":["step 1","step 2","step 3"],"benchmarkComment":"string","stackAssessment":"string","stackItems":[{"label":"string","value":"string","status":"ok|warn|gap"}]}`;
 
   try {
     let content = [];
@@ -935,76 +1220,70 @@ Return this exact structure:
 
     if (data.files.length > 0) {
       for (const file of data.files) {
-        const b64 = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result.split(',')[1]);
-          r.onerror = rej;
-          r.readAsDataURL(file);
-        });
-        const mt = file.type || 'application/octet-stream';
-        if (mt === 'application/pdf') {
+        const mt = file.type || '';
+        if (mt === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+          const b64 = await fileToB64(file);
           content.push({ type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } });
         } else if (mt.startsWith('image/')) {
+          const b64 = await fileToB64(file);
           content.push({ type:'image', source:{ type:'base64', media_type:mt, data:b64 } });
         }
       }
-      content.push({ type:'text', text:'Analyse these merchant statements.' + suffix });
+      data.parsedTabular.forEach(t => {
+        content.push({ type:'text', text:'Spreadsheet export "' + t.name + '" (CSV):\n' + t.text });
+      });
+      content.push({ type:'text', text:'Analyse these merchant statements and exports.' + suffix });
     } else {
-      content = [{ type:'text', text:'No statements uploaded. Analyse based on merchant profile only.' + suffix }];
+      content = [{ type:'text', text:'No statements uploaded. Analyse based on the merchant profile only.' + suffix }];
     }
 
     const res = await fetch('/api/analyse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system, messages: [{ role: 'user', content }] })
     });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error((e && e.error && e.error.message) || ('API error ' + res.status)); }
 
-    if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || 'API error ' + res.status); }
     const apiData = await res.json();
-    const rawText = (apiData.content.find(b => b.type==='text')?.text || '');
-    const jsonStart = rawText.indexOf('{');
-    const jsonEnd = rawText.lastIndexOf('}');
-    if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON found in response');
-    const raw = rawText.slice(jsonStart, jsonEnd + 1);
-    const report = JSON.parse(raw);
+    const rawText = (apiData.content.find(b => b.type === 'text')?.text || '');
+    const sIdx = rawText.indexOf('{'), eIdx = rawText.lastIndexOf('}');
+    if (sIdx === -1 || eIdx === -1) throw new Error('No JSON found in response');
+    const report = JSON.parse(rawText.slice(sIdx, eIdx + 1));
 
-    const filesPayload = await Promise.all(data.files.map(async f => {
-      const b64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result.split(',')[1]);
-        r.onerror = rej;
-        r.readAsDataURL(f);
-      });
-      return { name: f.name, type: f.type, size: f.size, data: b64 };
-    }));
+    const filesPayload = await Promise.all(data.files.map(async f => ({
+      name: f.name, type: f.type, size: f.size, data: await fileToB64(f)
+    })));
 
     await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        report,
-        programContext,
-        files: filesPayload,
-        submission: { name: data.firstname, email: data.email, phone: data.phone, submittedAt: new Date().toISOString() }
+        report, programContext, files: filesPayload,
+        submission: { name: data.name, email: data.email, phone: data.phone, submittedAt: new Date().toISOString() }
       })
     }).catch(() => null);
 
-    clearInterval(lsIv);
-    lsIds.forEach(id => document.getElementById(id).className = 'loading-step done');
-    setTimeout(() => {
-      loading.classList.remove('active');
-      document.getElementById('sConfirm').classList.add('active');
-    }, 500);
+    clearInterval(iv);
+    steps.forEach(id => document.getElementById(id).className = 'loading-step done');
+    setTimeout(() => { loading.classList.remove('active'); document.getElementById('sConfirm').classList.add('active'); }, 500);
 
-  } catch(err) {
-    clearInterval(lsIv);
+  } catch (err) {
+    clearInterval(iv);
     loading.classList.remove('active');
-    from.classList.add('active');
-    alert('Something went wrong: ' + err.message);
+    document.getElementById('sReview').classList.add('active');
+    alert('Something went wrong running your analysis: ' + err.message + '\n\nYour answers are saved — please try submitting again.');
   }
 }
 
+function fileToB64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
 renderProgress();
+updateChrome();
 </script>
 </body>
 </html>
