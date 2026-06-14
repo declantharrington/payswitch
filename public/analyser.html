@@ -550,13 +550,14 @@ input#fileInput { display: none; }
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'square')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Square</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'stripe')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Stripe</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'zeller')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Zeller</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'commbank')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">CommBank (Smart)</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'commbank')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">CBA</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'nab')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">NAB</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'westpac')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Westpac / EFTPOS</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'westpac')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Westpac</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'anz')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">ANZ Worldline</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'adyen')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Adyen</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'paypal')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">PayPal / Braintree</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'fatzebra')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Fat Zebra</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleProvider(this,'globalpayments')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Global Payments (Worldpay)</div></div><div class="choice-check"></div></div>
     </div>
     <div class="q-input-wrap">
       <label class="q-label" for="inp-provider-other">Other provider(s)</label>
@@ -582,7 +583,7 @@ input#fileInput { display: none; }
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','amex')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">American Express</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','unionpay')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">UnionPay</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','wallets')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Apple Pay / Google Pay</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','bnpl')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Buy Now Pay Later</div><div class="choice-sub">Afterpay, Zip</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','bnpl')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Buy Now Pay Later</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','paypal')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">PayPal</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','payto')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">PayTo</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggle(this,'paymentTypes','bpay')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">BPAY</div></div><div class="choice-check"></div></div>
@@ -643,18 +644,15 @@ input#fileInput { display: none; }
     </div>
   </div>
 
-  <!-- s6g: Surcharge (reframed around the Oct 2026 ban) -->
+  <!-- s6g: Surcharge (current behaviour) -->
   <div class="screen" id="s6g">
-    <div class="q-text">Do you surcharge —<br>and are you ready<br>for the 2026 ban?</div>
-    <div class="reg-note">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <div class="reg-note-text"><b>From 1 October 2026</b>, the RBA bans card surcharging on eftpos, Visa and Mastercard — alongside lower interchange caps. If you rely on surcharging today, your cost base is about to change.</div>
-    </div>
+    <div class="q-text">Do you pass on<br>the card surcharge?</div>
+    <div class="q-sub">Whether you add a card fee at checkout, or absorb the cost yourself.</div>
     <div class="choice-grid cols-1">
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','yes_planned')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">We surcharge, and have a plan for the ban</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','yes_noplan')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">We surcharge, but have no plan yet</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','no')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">We don't surcharge — we absorb the cost</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','unsure')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Not sure what this means for us</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','yes')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Yes — we pass it on to customers</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','no')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">No — we absorb the cost</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','partial')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Sometimes / only on some cards</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'surcharge','unsure')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Not sure</div></div><div class="choice-check"></div></div>
     </div>
   </div>
 
@@ -674,13 +672,12 @@ input#fileInput { display: none; }
   <!-- sAtv: Average transaction value -->
   <div class="screen" id="sAtv">
     <div class="q-text">What's your average<br>transaction value?</div>
-    <div class="q-sub">The single most important number for fee modelling — a $4 tap and a $4,000 invoice have completely different optimal pricing.</div>
     <div class="choice-grid cols-1">
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','under20')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Under $20</div><div class="choice-sub">Cafés, quick service, convenience</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','under20')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Under $20</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','20to75')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$20 – $75</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','75to250')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$75 – $250</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','250to1000')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$250 – $1,000</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','over1000')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$1,000+</div><div class="choice-sub">Trades, professional services, B2B</div></div><div class="choice-check"></div></div>
+      <div class="choice" tabindex="0" role="button" onclick="pick(this,'atv','over1000')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">$1,000+</div></div><div class="choice-check"></div></div>
     </div>
   </div>
 
@@ -1124,14 +1121,14 @@ async function verifyOtp() {
 // ---- Review summary ----
 const LABELS = {
   industry:{retail:'Retail',food:'Food & Hospitality',ecommerce:'eCommerce',health:'Healthcare',professional:'Professional Services',trades:'Trades & Construction',accommodation:'Accommodation',other:'Other'},
-  provider:{tyro:'Tyro',square:'Square',stripe:'Stripe',zeller:'Zeller',commbank:'CommBank (Smart)',nab:'NAB',westpac:'Westpac / EFTPOS',anz:'ANZ Worldline',adyen:'Adyen',paypal:'PayPal / Braintree',fatzebra:'Fat Zebra'},
+  provider:{tyro:'Tyro',square:'Square',stripe:'Stripe',zeller:'Zeller',commbank:'CBA',nab:'NAB',westpac:'Westpac',anz:'ANZ Worldline',adyen:'Adyen',paypal:'PayPal / Braintree',fatzebra:'Fat Zebra',globalpayments:'Global Payments (Worldpay)'},
   paymentTypes:{visa:'Visa',mastercard:'Mastercard',eftpos:'eftpos',amex:'American Express',unionpay:'UnionPay',wallets:'Apple/Google Pay',bnpl:'Buy Now Pay Later',paypal:'PayPal',payto:'PayTo',bpay:'BPAY',dd_bank:'Direct debit (bank)',dd_card:'Direct debit (card)',eft:'EFT / bank transfer'},
   monthlyVolume:{under10k:'Under $10k/mo','10to50k':'$10k–$50k/mo','50to250k':'$50k–$250k/mo','250kto1m':'$250k–$1M/mo',over1m:'$1M+/mo'},
   atv:{under20:'Under $20','20to75':'$20–$75','75to250':'$75–$250','250to1000':'$250–$1,000',over1000:'$1,000+'},
   cardMix:{mostly_debit:'Mostly debit',mostly_credit:'Mostly credit',even:'Even split',lots_intl:'Lots of intl/Amex',unknown:'Not sure'},
   pricingModel:{blended:'Blended',ic_plus:'Interchange Plus',ic_plusplus:'Interchange++',unknown:'Not sure'},
   lcrStatus:{on:'On',off:'Off',unknown:'Not sure'},
-  surcharge:{yes_planned:'Yes — has a plan',yes_noplan:'Yes — no plan yet',no:'No, absorbs it',unsure:'Not sure'},
+  surcharge:{yes:'Passes it on',no:'Absorbs it',partial:'Sometimes',unsure:'Not sure'},
   goal:{lower_fees:'Lower fees',better_tech:'Better tech',consolidate:'Consolidate',leave_provider:'Leave provider',benchmark:'Honest benchmark'}
 };
 function lbl(key, val){ return (LABELS[key] && LABELS[key][val]) || val; }
@@ -1273,7 +1270,7 @@ async function submitAll() {
     data.cardMix         ? 'Card mix: ' + (LABELS.cardMix[data.cardMix]||data.cardMix) : '',
     data.lcrStatus       ? 'LCR status: ' + data.lcrStatus : '',
     data.pricingModel    ? 'Current pricing model: ' + data.pricingModel : '',
-    data.surcharge       ? 'Surcharging / 2026-readiness: ' + (LABELS.surcharge[data.surcharge]||data.surcharge) : '',
+    data.surcharge       ? 'Surcharges customers: ' + (LABELS.surcharge[data.surcharge]||data.surcharge) : '',
     goalStr              ? 'Primary goal(s): ' + goalStr : '',
     data.pain            ? 'Biggest frustration: ' + data.pain : '',
     data.skippedUpload   ? 'Statements: not uploaded' : 'Statements uploaded: ' + data.files.length + ' file(s)' +
