@@ -395,7 +395,6 @@ input#fileInput { display: none; }
     Payswitch
   </a>
   <div class="progress-wrap" aria-hidden="true">
-    <div class="progress-label" id="progressLabel">Step 1</div>
     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
   </div>
 </header>
@@ -659,18 +658,6 @@ input#fileInput { display: none; }
     </div>
   </div>
 
-  <!-- sContract: Contract status -->
-  <div class="screen" id="sContract">
-    <div class="q-text">Are you locked into<br>a contract?</div>
-    <div class="q-sub">Lock-in terms, terminal rentals and exit fees all shape whether — and when — switching makes sense.</div>
-    <div class="choice-grid cols-1">
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'contract','locked')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Yes — fixed-term contract</div><div class="choice-sub">May have early-exit fees</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'contract','rolling')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Month-to-month, no lock-in</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'contract','ending')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">In a contract that's ending soon</div></div><div class="choice-check"></div></div>
-      <div class="choice" tabindex="0" role="button" onclick="pick(this,'contract','unknown')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Not sure</div></div><div class="choice-check"></div></div>
-    </div>
-  </div>
-
   <!-- sVolume: Monthly card volume -->
   <div class="screen" id="sVolume">
     <div class="q-text">Roughly how much<br>do you process on<br>cards each month?</div>
@@ -710,10 +697,10 @@ input#fileInput { display: none; }
     </div>
   </div>
 
-  <!-- sGoal: What would make this a win (multi-select + free text) -->
+  <!-- sGoal: What would make this a win + what's frustrating (merged) -->
   <div class="screen" id="sGoal">
     <div class="q-text">What would make<br>this a win for you?</div>
-    <div class="q-sub">Pick everything that matters — and add anything we've missed. This tells us how to weight your report.</div>
+    <div class="q-sub">Pick everything that matters, and tell us what's prompting the switch. This shapes what your report prioritises.</div>
     <div class="choice-grid cols-1">
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleGoal(this,'lower_fees')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Lower my fees</div></div><div class="choice-check"></div></div>
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleGoal(this,'better_tech')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Better tech or features</div><div class="choice-sub">Faster settlement, integrations, reporting</div></div><div class="choice-check"></div></div>
@@ -722,30 +709,14 @@ input#fileInput { display: none; }
       <div class="choice" tabindex="0" role="checkbox" aria-checked="false" onclick="toggleGoal(this,'benchmark')" onkeydown="kbd(event)"><div class="choice-text"><div class="choice-label">Just want an honest benchmark</div></div><div class="choice-check"></div></div>
     </div>
     <div class="q-input-wrap">
-      <label class="q-label" for="inp-goal-other">Anything else</label>
-      <input class="q-input" style="font-size:22px" type="text" id="inp-goal-other" placeholder="In your own words…" aria-label="Anything else that would make this a win" oninput="onGoalOther()">
+      <label class="q-label" for="inp-pain">Anything else frustrating you? (optional)</label>
+      <textarea class="q-input" id="inp-pain" aria-label="Anything else frustrating you" placeholder="e.g. fees feel too high, chargebacks I can't explain, clunky hardware…" rows="2" style="resize:none;font-size:18px;line-height:1.55;padding-top:8px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';data.pain=this.value.trim();updateGoalCta();refit()"></textarea>
     </div>
     <div class="cta-row">
       <button class="cta" id="ctaGoal" onclick="next()" disabled>
-        Continue
-        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- s8: Pain points -->
-  <div class="screen" id="s8">
-    <div class="q-text">Anything else<br>frustrating you?</div>
-    <div class="q-sub">What made you start looking? Be as specific as you like — chargebacks, surprise fees, clunky hardware. This shapes what we prioritise.</div>
-    <div class="q-input-wrap">
-      <textarea class="q-input" id="inp-pain" aria-label="Your biggest frustration" placeholder="e.g. Fees feel too high but I can't figure out why. I'm getting chargebacks I can't explain…" rows="3" style="resize:none;font-size:18px;line-height:1.55;padding-top:8px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';data.pain=this.value.trim();refit()"></textarea>
-    </div>
-    <div class="cta-row">
-      <button class="cta" id="ctaS8" onclick="next()">
         Review my answers
         <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
       </button>
-      <button class="skip-link" onclick="data.pain='';document.getElementById('inp-pain').value='';next()">Skip this question</button>
     </div>
   </div>
 
@@ -805,6 +776,12 @@ input#fileInput { display: none; }
         </div>
       </div>
     </div>
+    <div class="cta-row" style="margin-top:32px">
+      <a class="cta" href="/">
+        Back to homepage
+        <svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><path d="M6 12h12"/></svg>
+      </a>
+    </div>
   </div>
 
 </div>
@@ -817,7 +794,7 @@ const data = {
   ecomPlatform: '', terminalSetup: '',
   providers: [], providerOther: '', paymentTypes: [],
   monthlyVolume: '', atv: '', cardMix: '',
-  lcrStatus: '', pricingModel: '', surcharge: '', contract: '', goals: [], goalOther: '', pain: ''
+  lcrStatus: '', pricingModel: '', surcharge: '', goals: [], pain: ''
 };
 let otp = { sent: false };
 
@@ -835,7 +812,7 @@ function computePath() {
   if (data.channels.includes('instore')) p.push('s6c');
   p.push('s6f');
   if (data.channels.includes('instore')) p.push('s6e'); // LCR is terminal-side
-  p.push('s6g','sContract','sVolume','sAtv','sMix','sGoal','s8','sReview');
+  p.push('s6g','sVolume','sAtv','sMix','sGoal','sReview');
   return p;
 }
 
@@ -844,7 +821,6 @@ function renderProgress() {
   const idx = Math.max(0, path.indexOf(currentId));
   const pct = path.length > 1 ? (idx / (path.length - 1)) * 100 : 0;
   document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressLabel').textContent = 'Step ' + (idx + 1) + ' of ' + path.length;
 }
 
 const KEYHINT_SCREENS = ['s1','s2','s3','s4']; // only single-text-input screens use Enter
@@ -995,12 +971,8 @@ function toggleGoal(el, val) {
   else    { data.goals = data.goals.filter(v => v !== val); }
   updateGoalCta();
 }
-function onGoalOther() {
-  data.goalOther = document.getElementById('inp-goal-other').value.trim();
-  updateGoalCta();
-}
 function updateGoalCta() {
-  document.getElementById('ctaGoal').disabled = !(data.goals.length || data.goalOther);
+  document.getElementById('ctaGoal').disabled = !(data.goals.length || data.pain);
 }
 
 // ---- Text validators ----
@@ -1160,7 +1132,6 @@ const LABELS = {
   pricingModel:{blended:'Blended',ic_plus:'Interchange Plus',ic_plusplus:'Interchange++',unknown:'Not sure'},
   lcrStatus:{on:'On',off:'Off',unknown:'Not sure'},
   surcharge:{yes_planned:'Yes — has a plan',yes_noplan:'Yes — no plan yet',no:'No, absorbs it',unsure:'Not sure'},
-  contract:{locked:'Fixed-term',rolling:'Month-to-month',ending:'Ending soon',unknown:'Not sure'},
   goal:{lower_fees:'Lower fees',better_tech:'Better tech',consolidate:'Consolidate',leave_provider:'Leave provider',benchmark:'Honest benchmark'}
 };
 function lbl(key, val){ return (LABELS[key] && LABELS[key][val]) || val; }
@@ -1171,7 +1142,6 @@ function providerSummary() {
 }
 function goalSummary() {
   const names = data.goals.map(g => lbl('goal', g));
-  if (data.goalOther) names.push(data.goalOther);
   return names.join(', ');
 }
 function renderReview() {
@@ -1188,7 +1158,6 @@ function renderReview() {
   add('Pricing model', lbl('pricingModel', data.pricingModel), 's6f');
   if (data.lcrStatus) add('LCR', lbl('lcrStatus', data.lcrStatus), 's6e');
   add('Surcharging', lbl('surcharge', data.surcharge), 's6g');
-  add('Contract', lbl('contract', data.contract), 'sContract');
   add('Monthly card volume', lbl('monthlyVolume', data.monthlyVolume), 'sVolume');
   add('Avg transaction', lbl('atv', data.atv), 'sAtv');
   add('Card mix', lbl('cardMix', data.cardMix), 'sMix');
@@ -1305,7 +1274,6 @@ async function submitAll() {
     data.lcrStatus       ? 'LCR status: ' + data.lcrStatus : '',
     data.pricingModel    ? 'Current pricing model: ' + data.pricingModel : '',
     data.surcharge       ? 'Surcharging / 2026-readiness: ' + (LABELS.surcharge[data.surcharge]||data.surcharge) : '',
-    data.contract        ? 'Contract status: ' + (LABELS.contract[data.contract]||data.contract) : '',
     goalStr              ? 'Primary goal(s): ' + goalStr : '',
     data.pain            ? 'Biggest frustration: ' + data.pain : '',
     data.skippedUpload   ? 'Statements: not uploaded' : 'Statements uploaded: ' + data.files.length + ' file(s)' +
@@ -1316,7 +1284,7 @@ async function submitAll() {
 
 AUSTRALIAN REGULATORY CONTEXT (current, must be applied): From 1 October 2026 the RBA bans card surcharging on eftpos, Visa and Mastercard. At the same time interchange caps fall — domestic consumer credit from 0.8% to 0.3% and debit from 0.2% to 0.16% — with a 1% cap on foreign-card interchange from 1 April 2027, plus new provider fee-transparency rules. Model the merchant's cost base AFTER these changes: if they rely on surcharging, flag the transition risk; treat the interchange cuts and transparency rules as concrete reasons to review now. Put the merchant-specific implication in the "regulatoryImpact" field.
 
-IMPORTANT: Reference the merchant's specific current provider(s), industry, channels, accepted payment types, average transaction value, monthly card volume, card mix, contract status, stated goal and pain points. Every recommendation must be tailored to their actual situation, never generic. If statements (PDFs, images, or parsed spreadsheet exports) are provided, extract real figures from them; otherwise estimate from the profile and say so.
+IMPORTANT: Reference the merchant's specific current provider(s), industry, channels, accepted payment types, average transaction value, monthly card volume, card mix, stated goal and pain points. Every recommendation must be tailored to their actual situation, never generic. If statements (PDFs, images, or parsed spreadsheet exports) are provided, extract real figures from them; otherwise estimate from the profile and say so.
 
 Return this exact structure:
 {"provider":"string","currentProvider":"string","period":"string","volume":null,"transactions":null,"totalFees":null,"effectiveRate":null,"perTransactionFee":null,"monthlyFee":null,"terminalFees":null,"averageTxnValue":"string","monthlyCardVolume":"string","cardMix":"string","acceptedPaymentTypes":"string","pricingModel":"blended|ic_plus|ic_plusplus|unknown","lcrStatus":"on|off|unknown","contractStatus":"string","primaryGoal":"string","surchargeReadiness":"string","feeBreakdown":[{"label":"string","amount":0,"note":null}],"alerts":[{"type":"warn|good|info","heading":"string","body":"string"}],"executiveSummary":"string","pricingModelAnalysis":"string","savingsOpportunity":"string","lcrAnalysis":"string","regulatoryImpact":"string","acceptanceGaps":"string","keyRecommendation":"string","nextSteps":["step 1","step 2","step 3"],"benchmarkComment":"string","stackAssessment":"string","stackItems":[{"label":"string","value":"string","status":"ok|warn|gap"}]}`;
