@@ -1,5 +1,19 @@
 // api/submit.js
-module.exports = async function handler(req, res) {
+// Receives a merchant submission from the front end: stores any uploaded
+// statement files + the analysis in Supabase, and emails an internal triage
+// notification to the PaySwitch admin.
+//
+// NOTE: the admin email below is an INTERNAL notification, not the client-facing
+// report. It intentionally shows the raw AI findings (including recommendations)
+// so the admin can review before approving. The non-prescriptive report
+// philosophy applies to generate-report.js, NOT here.
+
+export const config = {
+  // File uploads (base64 statements) + DB insert + email can run long.
+  maxDuration: 60,
+};
+
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -7,24 +21,37 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  try {
-    const { submission, report, programContext, files } = req.body;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+  const resendKey   = process.env.RESEND_API_KEY;
+  const adminEmail  = process.env.ADMIN_EMAIL || 'declan.t.harrington@gmail.com';
+  const fromEmail   = process.env.RESEND_FROM || 'Payswitch Submissions <onboarding@resend.dev>';
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_ANON_KEY;
-    const resendKey   = process.env.RESEND_API_KEY;
+  // Supabase is required to store the submission; without it the whole flow
+  // (including later approval/report generation) cannot work.
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('submit: missing Supabase environment variables');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
+  try {
+    const { report, programContext, files } = req.body;
+
+    if (!report) return res.status(400).json({ error: 'report required' });
 
     // ── Upload files to Supabase Storage ─────────────────────────
     const uploadedFiles = [];
 
-    if (files && files.length > 0) {
-      for (const file of files) {
+    if (Array.isArray(files) && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         try {
           // file = { name, type, data (base64) }
           const binaryData = Buffer.from(file.data, 'base64');
-          const timestamp  = Date.now();
           const safeName   = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const path       = `${timestamp}_${safeName}`;
+          // Include the index so two files uploaded in the same millisecond
+          // can't collide on the same path (x-upsert is false below).
+          const path       = `${Date.now()}_${i}_${safeName}`;
 
           const uploadRes = await fetch(
             `${supabaseUrl}/storage/v1/object/statements/${path}`,
@@ -52,7 +79,7 @@ module.exports = async function handler(req, res) {
             console.error(`File upload failed for ${file.name}:`, err);
           }
         } catch (fileErr) {
-          console.error(`Error uploading ${file.name}:`, fileErr.message);
+          console.error(`Error uploading ${file?.name}:`, fileErr.message);
         }
       }
     }
@@ -82,19 +109,38 @@ module.exports = async function handler(req, res) {
       }),
     });
 
+    // A failed insert means there is no row to approve later — surface it
+    // rather than returning a misleading success with id "new".
+    if (!dbRes.ok) {
+      const detail = await dbRes.text();
+      console.error('submit: DB insert failed:', dbRes.status, detail);
+      throw new Error(`Failed to store submission: ${dbRes.status}`);
+    }
+
     const dbData = await dbRes.json();
-    const submissionId = Array.isArray(dbData) && dbData[0] ? dbData[0].id : 'new';
+    const submissionId = Array.isArray(dbData) && dbData[0] ? dbData[0].id : null;
 
     // ── Format helpers ────────────────────────────────────────────
     const fmtD = n => n != null ? '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
     const fmtP = n => n != null ? Number(n).toFixed(2) + '%' : '—';
 
-    const alertsHtml = (report.alerts || []).map(a =>
-      `<div style="padding:10px 14px;margin-bottom:8px;border-radius:8px;border-left:3px solid ${a.type==='warn'?'#c8960c':a.type==='good'?'#0a7a52':'#1a5cff'};background:${a.type==='warn'?'#fdf6e3':a.type==='good'?'#e6f4ed':'#eef3ff'}">
-        <strong style="display:block;margin-bottom:3px;font-size:13px;">${a.heading}</strong>
-        <span style="font-size:13px;color:#444">${a.body}</span>
-      </div>`
-    ).join('');
+    // The analyser now returns FACTS only (no prose/findings — those are added at
+    // report-generation time). The triage email reflects those facts.
+    const observationsHtml = Array.isArray(report.observations) && report.observations.length
+      ? `<ul style="margin:0;padding-left:18px">${report.observations.map(o =>
+          `<li style="font-size:13px;line-height:1.7;color:#444;margin-bottom:4px">${o}</li>`).join('')}</ul>`
+      : '<p style="font-size:13px;color:#999">No observations recorded</p>';
+
+    const setupHtml = Array.isArray(report.setup) && report.setup.length
+      ? `<table><tbody>${report.setup.map(s =>
+          `<tr><td style="color:#666">${s.label}</td><td>${s.value}</td></tr>`).join('')}</tbody></table>`
+      : '<p style="font-size:13px;color:#999">No setup details recorded</p>';
+
+    const cardMix = report.cardMix || {};
+    const cardMixHtml = Object.entries(cardMix).filter(([, v]) => v != null).length
+      ? `<table><tbody>${Object.entries(cardMix).filter(([, v]) => v != null).map(([k, v]) =>
+          `<tr><td style="color:#666;text-transform:capitalize">${k}</td><td>${v}%</td></tr>`).join('')}</tbody></table>`
+      : '';
 
     // ── Files section for email ───────────────────────────────────
     const filesHtml = uploadedFiles.length > 0
@@ -108,8 +154,11 @@ module.exports = async function handler(req, res) {
          </div>`
       : '<p style="font-size:13px;color:#999">No files uploaded</p>';
 
-    // ── Send email via Resend ─────────────────────────────────────
-    const emailHtml = `<!DOCTYPE html>
+    // ── Send internal triage email via Resend (non-fatal) ─────────
+    if (!resendKey) {
+      console.warn('submit: RESEND_API_KEY not set — skipping admin notification email.');
+    } else {
+      const emailHtml = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
 <style>
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;margin:0;padding:0}
@@ -143,7 +192,7 @@ tr:last-child td{border-bottom:none}
 </style></head>
 <body><div class="wrap">
 <div class="hdr">
-  <div class="hdr-label">New Submission · Payswitch AI · #${submissionId}</div>
+  <div class="hdr-label">New Submission · Payswitch AI · #${submissionId ?? '—'}</div>
   <div class="hdr-title">${report.provider || 'Unknown Provider'} — ${report.period || 'Review'}</div>
   <div class="hdr-meta">Submitted ${new Date().toLocaleString('en-AU', { dateStyle: 'long', timeStyle: 'short' })}</div>
   <div class="stats">
@@ -153,55 +202,62 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 <div class="body">
-  ${report.executiveSummary ? `<div class="section"><div class="sec-label">Executive Summary</div><div class="sec-text">${report.executiveSummary}</div></div>` : ''}
   <div class="section">
-    <div class="sec-label">Statement Data</div>
+    <div class="sec-label">Statement Data (extracted)</div>
     <table>
       <tr><td>Card volume</td><td>${fmtD(report.volume)}</td></tr>
       <tr><td>Total fees</td><td>${fmtD(report.totalFees)}</td></tr>
       <tr><td>Effective rate</td><td>${fmtP(report.effectiveRate)}</td></tr>
+      <tr><td>Transactions</td><td>${report.transactions != null ? Number(report.transactions).toLocaleString('en-AU') : '—'}</td></tr>
+      <tr><td>Avg transaction value</td><td>${fmtD(report.averageTransactionValue)}</td></tr>
+      <tr><td>Monthly fee</td><td>${fmtD(report.monthlyFee)}</td></tr>
+      <tr><td>Terminal fees</td><td>${fmtD(report.terminalFees)}</td></tr>
       <tr><td>Pricing model</td><td>${report.pricingModel || '—'}</td></tr>
       <tr><td>LCR status</td><td>${report.lcrStatus || '—'}</td></tr>
     </table>
   </div>
-  ${alertsHtml ? `<div class="section"><div class="sec-label">Key Findings</div>${alertsHtml}</div>` : ''}
+  ${cardMixHtml ? `<div class="section"><div class="sec-label">Card Mix</div>${cardMixHtml}</div>` : ''}
+  <div class="section"><div class="sec-label">Factual Observations</div>${observationsHtml}</div>
+  <div class="section"><div class="sec-label">Current Setup</div>${setupHtml}</div>
   ${programContext ? `<div class="section"><div class="sec-label">Merchant Profile</div><div class="prog-box">${programContext.replace(/\n/g, '<br>')}</div></div>` : ''}
   <div class="section">
     <div class="sec-label">Uploaded Files (${uploadedFiles.length})</div>
     ${filesHtml}
     ${uploadedFiles.length > 0 ? `<p style="font-size:12px;color:#999;margin-top:10px">View files in Supabase Storage → statements bucket</p>` : ''}
   </div>
-  ${report.savingsOpportunity ? `<div class="section"><div class="sec-label">Savings Opportunity</div><div class="sec-text">${report.savingsOpportunity}</div></div>` : ''}
-  ${report.keyRecommendation ? `
-  <div class="section">
-    <div class="rec-box">
-      <div class="rec-label">Recommendation</div>
-      <div class="rec-h">${report.keyRecommendation}</div>
-      ${report.nextSteps && report.nextSteps.length ? `<ol class="rec-steps">${report.nextSteps.map(s => `<li>${s}</li>`).join('')}</ol>` : ''}
-    </div>
-  </div>` : ''}
   <div class="section" style="text-align:center;padding:24px 0">
     <a href="https://payswitch-eight.vercel.app/admin.html" class="review-btn">Open Dashboard →</a>
   </div>
 </div>
 </div></body></html>`;
 
-    const emailRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${resendKey}`,
-      },
-      body: JSON.stringify({
-        from:    'Payswitch Submissions <onboarding@resend.dev>',
-        to:      ['declan.t.harrington@gmail.com'],
-        subject: `New submission — ${report.provider || 'Unknown'} · ${fmtP(report.effectiveRate)} · ${uploadedFiles.length} file(s)`,
-        html:    emailHtml,
-      }),
-    });
+      try {
+        const emailRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${resendKey}`,
+          },
+          body: JSON.stringify({
+            from:    fromEmail,
+            to:      [adminEmail],
+            subject: `New submission — ${report.provider || 'Unknown'} · ${fmtP(report.effectiveRate)} · ${uploadedFiles.length} file(s)`,
+            html:    emailHtml,
+          }),
+        });
 
-    const emailData = await emailRes.json();
-    console.log('Email result:', JSON.stringify(emailData));
+        const emailData = await emailRes.json();
+        if (!emailRes.ok) {
+          console.error('submit: Resend email failed:', emailRes.status, JSON.stringify(emailData));
+        } else {
+          console.log('Email result:', JSON.stringify(emailData));
+        }
+      } catch (emailErr) {
+        // Email is a notification convenience; the submission is already stored,
+        // so don't fail the request if it can't be sent.
+        console.error('submit: error sending admin email:', emailErr.message);
+      }
+    }
 
     return res.status(200).json({ success: true, id: submissionId, filesUploaded: uploadedFiles.length });
 
@@ -209,4 +265,4 @@ tr:last-child td{border-bottom:none}
     console.error('Submit error:', err.message);
     return res.status(500).json({ error: err.message });
   }
-};
+}
