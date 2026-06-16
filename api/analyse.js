@@ -1,6 +1,19 @@
 // api/analyse.js
+//
+// This is the PROXY endpoint. It receives { system, messages, model?, max_tokens? }
+// from the front end (analyser.html) and forwards the request to the Anthropic
+// API, returning the raw response. It does NOT contain the analyser prompt —
+// that is sent by the front end. (The canonical copy of the prompt text lives in
+// api/_lib/analyse-prompt.js; do not paste it into this file.)
+
 export const config = {
   maxDuration: 120,
+  // Statements are sent as base64 inside the JSON body. The default 1mb limit
+  // (Next.js API routes) is far too small for a PDF, which is what caused the
+  // 500. (On plain Vercel Functions this is ignored and the hard cap is ~4.5MB —
+  // if a single file ever exceeds that, upload it to storage first rather than
+  // inlining base64.)
+  api: { bodyParser: { sizeLimit: '15mb' } },
 };
 
 export default async function handler(req, res) {
@@ -19,13 +32,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
-  // The payments report is a large JSON object - several prose fields plus four
-  // arrays of objects (feeBreakdown, alerts, nextSteps, stackItems). If the
-  // output cap is too low the JSON gets cut off mid-array and fails to parse.
-  // Claude Haiku 4.5 supports up to 64k output tokens, so we give the report
-  // comfortable headroom and enforce a floor so a low/blank client value can't
-  // reintroduce truncation. (You only pay for tokens actually generated, and
-  // the model stops on its own at end_turn, so a high cap is free headroom.)
+  // The analyser now returns a small, factual JSON object, so it no longer needs
+  // a huge output budget — but we keep a sensible floor and cap so a low/blank
+  // client value can't truncate the response, and a high cap is free headroom
+  // (you only pay for tokens generated; the model stops on its own at end_turn).
   const MODEL = model || 'claude-haiku-4-5-20251001';
   const MODEL_OUTPUT_CAP = 64000; // Haiku 4.5 max output tokens
   const resolvedMaxTokens = Math.min(
@@ -57,12 +67,10 @@ export default async function handler(req, res) {
 
     const data = await anthropicRes.json();
 
-    // If the model still hit the ceiling, say so in the logs so it's obvious
-    // the cap (or the report length) needs another look.
     if (data && data.stop_reason === 'max_tokens') {
       console.warn(
         `analyse.js: response stopped at max_tokens (${resolvedMaxTokens}). ` +
-        `The report was truncated - raise resolvedMaxTokens.`
+        `The output was truncated - raise the cap or check the prompt.`
       );
     }
 
