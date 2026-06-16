@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { submissionId } = req.body;
+  const { submissionId, overrides = {} } = req.body;
   if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
 
   const supabaseUrl  = process.env.SUPABASE_URL;
@@ -54,6 +54,34 @@ export default async function handler(req, res) {
     const submission     = rows[0];
     const report         = JSON.parse(submission.report_json || '{}');
     const programContext = submission.program_context || '';
+
+    // ── 1b. Apply admin overrides from the dashboard edit panel ───
+    // The admin can correct extracted facts (e.g. a misread total) and add
+    // internal notes before generating. Only whitelisted fact fields are merged.
+    const adminNotes = (overrides.adminNotes || '').trim();
+    const numericFields = ['volume', 'totalFees', 'effectiveRate', 'transactions', 'monthlyFee', 'terminalFees', 'perTransactionFee'];
+    const stringFields  = ['provider', 'period', 'providerRate', 'pricingModel', 'lcrStatus'];
+    for (const k of numericFields) {
+      if (overrides[k] !== undefined && overrides[k] !== null && overrides[k] !== '') {
+        const n = Number(overrides[k]);
+        if (!Number.isNaN(n)) report[k] = n;
+      }
+    }
+    for (const k of stringFields) {
+      if (typeof overrides[k] === 'string' && overrides[k].trim()) report[k] = overrides[k].trim();
+    }
+    if (Array.isArray(overrides.observations) && overrides.observations.length) {
+      report.observations = overrides.observations.map(o => String(o).trim()).filter(Boolean);
+    }
+    if (overrides.cardMix && typeof overrides.cardMix === 'object') {
+      report.cardMix = { ...(report.cardMix || {}), ...overrides.cardMix };
+    }
+    // Recompute effective rate from corrected volume/totalFees unless the admin
+    // set it explicitly, so a corrected total flows through to the headline rate.
+    if ((overrides.effectiveRate === undefined || overrides.effectiveRate === '') &&
+        report.volume && report.totalFees) {
+      report.effectiveRate = (Number(report.totalFees) / Number(report.volume)) * 100;
+    }
 
     // ── 2. Determine revenue band for tone calibration ────────────
     const ctxLower = programContext.toLowerCase();
@@ -229,7 +257,10 @@ FACTUAL OBSERVATIONS FROM THE STATEMENT:
 ${observationsStr}
 
 MERCHANT PROFILE:
-${programContext}`;
+${programContext}${adminNotes ? `
+
+ADMIN NOTES (internal context from the PaySwitch reviewer — use to inform the analysis, but do NOT quote or attribute these in the report):
+${adminNotes}` : ''}`;
 
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -376,6 +407,8 @@ ${programContext}`;
     }
 
     // ── 11. Update submission status ──────────────────────────────
+    // Persist the (possibly admin-corrected) facts back to report_json and the
+    // indexed columns so the dashboard list/modal reflect any edits made here.
     await fetch(`${supabaseUrl}/rest/v1/submissions?id=eq.${submissionId}`, {
       method: 'PATCH',
       headers: {
@@ -386,7 +419,15 @@ ${programContext}`;
       body: JSON.stringify({
         status:           'approved',
         report_narrative: JSON.stringify(narrative),
-        report_html_path: htmlPath
+        report_html_path: htmlPath,
+        report_json:      JSON.stringify(report),
+        provider:         report.provider ?? null,
+        period:           report.period ?? null,
+        volume:           report.volume ?? null,
+        total_fees:       report.totalFees ?? null,
+        effective_rate:   report.effectiveRate ?? null,
+        pricing_model:    report.pricingModel ?? null,
+        lcr_status:       report.lcrStatus ?? null
       })
     });
 
