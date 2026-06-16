@@ -11,7 +11,87 @@
 export const config = {
   // File uploads (base64 statements) + DB insert + email can run long.
   maxDuration: 60,
+  // Statements arrive as base64 in the JSON body; the default 1mb limit (Next.js
+  // API routes) is far too small for PDFs. Raise it. (On plain Vercel Functions
+  // this is ignored and the hard cap is ~4.5MB — see notes if you hit that.)
+  api: { bodyParser: { sizeLimit: '15mb' } },
 };
+
+// Flatten a multi-statement analyser payload into the single-object schema.
+// Handles a top-level array, or an array nested under period/periods/statements/
+// months. A single flat object is returned unchanged. Summable facts are summed,
+// rates are recomputed from the combined totals, and cardMix is volume-weighted.
+function consolidateStatements(raw) {
+  let list = null;
+  if (Array.isArray(raw)) list = raw;
+  else if (raw && typeof raw === 'object') {
+    for (const k of ['periods', 'statements', 'months', 'period']) {
+      if (Array.isArray(raw[k]) && raw[k].length && typeof raw[k][0] === 'object') { list = raw[k]; break; }
+    }
+  }
+  if (!list || !list.length) return raw || {};
+
+  const n = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
+  const sum = key => {
+    let t = 0, any = false;
+    for (const s of list) { const v = n(s[key]); if (v != null) { t += v; any = true; } }
+    return any ? Math.round(t * 100) / 100 : null;
+  };
+  const firstNonNull = key => {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw[key] != null && raw[key] !== '') return raw[key];
+    for (const s of list) if (s[key] != null && s[key] !== '') return s[key];
+    return null;
+  };
+
+  const volume = sum('volume');
+  const totalFees = sum('totalFees');
+  let transactions = 0, hasTxn = false;
+  for (const s of list) { const v = n(s.transactions); if (v != null) { transactions += v; hasTxn = true; } }
+
+  const feeMap = new Map();
+  for (const s of list) for (const it of (s.feeBreakdown || [])) {
+    if (!it || !it.label) continue;
+    feeMap.set(it.label, (feeMap.get(it.label) || 0) + (n(it.amount) || 0));
+  }
+  const feeBreakdown = [...feeMap].map(([label, amount]) => ({ label, amount: Math.round(amount * 100) / 100 }));
+
+  const cardMix = {};
+  for (const type of ['debit', 'credit', 'amex', 'foreign']) {
+    let ws = 0, wt = 0, any = false;
+    for (const s of list) {
+      const pct = n(s.cardMix && s.cardMix[type]); const w = n(s.volume) || 0;
+      if (pct != null && w > 0) { ws += pct * w; wt += w; any = true; }
+    }
+    cardMix[type] = (any && wt > 0) ? Math.round((ws / wt) * 100) / 100 : null;
+  }
+
+  const labels = list.map(s => s.period || s.month).filter(Boolean);
+  const period = labels.length ? (labels.length > 1 ? `${labels[labels.length - 1]} - ${labels[0]}` : labels[0]) : firstNonNull('period');
+
+  const observations = (list.length > 1 ? [`Consolidated from ${list.length} statements${period ? ' (' + period + ')' : ''}.`] : [])
+    .concat(...list.map(s => Array.isArray(s.observations) ? s.observations : []))
+    .filter(Boolean);
+
+  return {
+    provider: firstNonNull('provider'),
+    period,
+    volume,
+    totalFees,
+    effectiveRate: (volume && totalFees) ? Math.round((totalFees / volume * 100) * 1000) / 1000 : null,
+    transactions: hasTxn ? transactions : null,
+    averageTransactionValue: (volume && hasTxn && transactions) ? Math.round((volume / transactions) * 100) / 100 : null,
+    monthlyFee: sum('monthlyFee'),
+    terminalFees: sum('terminalFees'),
+    perTransactionFee: firstNonNull('perTransactionFee'),
+    pricingModel: firstNonNull('pricingModel'),
+    providerRate: firstNonNull('providerRate'),
+    lcrStatus: firstNonNull('lcrStatus'),
+    cardMix,
+    feeBreakdown,
+    setup: firstNonNull('setup') || [],
+    observations,
+  };
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -35,9 +115,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { report, programContext, files } = req.body;
+    const { report: rawReport, programContext, files } = req.body;
 
-    if (!report) return res.status(400).json({ error: 'report required' });
+    if (!rawReport) return res.status(400).json({ error: 'report required' });
+
+    // Merchants can upload several months. The analyser is asked to consolidate
+    // them, but if it returns per-statement objects we flatten them here so the
+    // rest of the pipeline always sees the single-object schema.
+    const report = consolidateStatements(rawReport);
 
     // ── Upload files to Supabase Storage ─────────────────────────
     const uploadedFiles = [];
