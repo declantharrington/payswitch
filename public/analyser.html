@@ -1277,10 +1277,10 @@ async function submitAll() {
                             (data.parsedTabular.length ? ' (' + data.parsedTabular.length + ' spreadsheet export(s) parsed inline)' : '')
   ].filter(Boolean).join('\n');
  
-   // FACTUAL extraction only. Keep this lean — the generate-report step adds all
+  // FACTUAL extraction only. Keep this lean — the generate-report step adds all
   // narrative, benchmarks, findings and opinions using the full Knowledge Base.
   // Keep this schema in sync with api/_lib/analyse-prompt.js.
-  const system = `You are a payments statement analyser for PaySwitch. Read the merchant's payment statement(s) and any parsed spreadsheet exports and extract or compute ONLY factual information from them.
+  const system = `You are a payments statement analyser for PaySwitch. Read the merchant's payment statement(s) and extract or compute ONLY factual information from them.
  
 Do NOT write narrative, opinions, recommendations, benchmarks, marketing language or advice — interpretation happens in a later step. Be precise, terse and strictly grounded in what the statements actually show. A merchant profile may also be provided for context, but your job is to extract the statement facts. If a value is not present in the statements, use null — never guess or estimate.
  
@@ -1288,6 +1288,7 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble. Use this EXACT s
 {"provider":null,"period":null,"volume":null,"totalFees":null,"effectiveRate":null,"transactions":null,"averageTransactionValue":null,"monthlyFee":null,"terminalFees":null,"perTransactionFee":null,"pricingModel":null,"providerRate":null,"lcrStatus":null,"cardMix":{"debit":null,"credit":null,"amex":null,"foreign":null},"feeBreakdown":[{"label":"string","amount":0}],"setup":[{"label":"string","value":"string"}],"observations":["string"]}
  
 RULES:
+- MULTIPLE STATEMENTS: if more than one statement or month is provided, CONSOLIDATE them into ONE combined result — do NOT return an array or per-statement objects, and do NOT nest statements inside a field. Sum volume, totalFees, transactions, monthlyFee, terminalFees and each matching feeBreakdown line item across all statements; recompute effectiveRate and averageTransactionValue from the combined totals; volume-weight the cardMix percentages; keep provider, pricingModel, providerRate, perTransactionFee and lcrStatus (which are constant across months); and set period to the full range covered (e.g. "January-February 2026").
 - Numeric fields contain numbers only — no currency symbols, no percent signs, no commas.
 - All fee figures are GST-INCLUSIVE. Use the statement's headline total, which normally includes GST. Do NOT take fees from a GST-exclusive "average cost" / "cost of acceptance" summary table.
 - totalFees: if the statement shows a stated total fees figure (e.g. "Total card fees", "Total fees", "Total amount payable", "Total merchant fees"), use THAT figure (GST-inclusive). Only if no stated total exists, sum the individual fee components.
