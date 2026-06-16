@@ -8,8 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<!-- SheetJS: parses CSV/XLSX dashboard exports client-side so they actually reach the AI -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --black:       #020408;
@@ -517,7 +515,7 @@ input#fileInput { display: none; }
   <!-- s0: Upload (now after contact — the bigger ask, made once the lead is captured) -->
   <div class="screen" id="s0">
     <div class="q-text">Upload your<br>merchant statements.</div>
-    <div class="q-sub">The last 3 months gives the clearest picture. Dashboard exports work too — Stripe, Square, Shopify Payments and the like. <b>CSV and Excel files are read in full.</b></div>
+    <div class="q-sub">The last 3 months gives the clearest picture — upload a PDF statement, or a clear photo of each.</div>
     <div class="file-chips" id="fileChips"></div>
     <div class="upload-zone" id="uploadZone" role="button" tabindex="0" aria-label="Upload statements"
          onclick="document.getElementById('fileInput').click()"
@@ -527,10 +525,10 @@ input#fileInput { display: none; }
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       </div>
       <div class="upload-title">Drop files here</div>
-      <div class="upload-sub">PDF statements, photos, or dashboard exports<br>Up to 10 files</div>
-      <div class="upload-formats">PDF · PNG · JPG · XLSX · CSV</div>
+      <div class="upload-sub">PDF statements or photos<br>Up to 10 files</div>
+      <div class="upload-formats">PDF · PNG · JPG</div>
     </div>
-    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,application/pdf,image/png,image/jpeg" multiple onchange="onFileSelect(event)">
+    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,application/pdf,image/png,image/jpeg,image/webp,image/gif" multiple onchange="onFileSelect(event)">
     <div class="status-msg" id="statusS0"></div>
     <div class="cta-row">
       <button class="cta" id="ctaS0" onclick="next()" disabled>
@@ -978,7 +976,7 @@ function validateEmail() { data.email = document.getElementById('inp-email').val
 function validatePhone() { data.phone = document.getElementById('inp-phone').value.trim(); document.getElementById('ctaS4').disabled = data.phone.replace(/\D/g,'').length < 8; }
 function firstName() { return (data.name.split(' ')[0] || data.name); }
 
-// ---- File upload (with CSV/XLSX parsing + HEIC guard) ----
+// ---- File upload (PDF + image only, with HEIC guard) ----
 function onDragOver(e){ e.preventDefault(); document.getElementById('uploadZone').classList.add('drag-over'); }
 function onDragLeave(){ document.getElementById('uploadZone').classList.remove('drag-over'); }
 function onDrop(e){ e.preventDefault(); document.getElementById('uploadZone').classList.remove('drag-over'); Array.from(e.dataTransfer.files).forEach(addFile); }
@@ -996,9 +994,13 @@ function addFile(f) {
     uploadError('HEIC images aren\'t supported. On iPhone, take a screenshot of the statement or save it as JPG, or upload the PDF.');
     return;
   }
-  const isTabular = (ext === 'csv' || ext === 'xlsx' || ext === 'xls');
+  const ALLOWED_EXT = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif'];
+  const isAllowed = ALLOWED_EXT.includes(ext) || f.type === 'application/pdf' || (f.type || '').startsWith('image/');
+  if (!isAllowed) {
+    uploadError('Please upload your card processing statement as a PDF or image (PNG/JPG). Spreadsheets and other files aren\'t supported.');
+    return;
+  }
   data.files.push(f);
-  if (isTabular) parseTabular(f);
   renderChips();
   document.getElementById('ctaS0').disabled = false;
 }
@@ -1007,30 +1009,6 @@ function removeFile(i) {
   if (removed) data.parsedTabular = data.parsedTabular.filter(t => t.name !== removed.name);
   renderChips();
   if (!data.files.length) document.getElementById('ctaS0').disabled = true;
-}
-function parseTabular(f) {
-  const r = new FileReader();
-  r.onload = e => {
-    try {
-      if (typeof XLSX === 'undefined') throw new Error('no-lib');
-      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-      let text = '';
-      wb.SheetNames.forEach(n => { text += '\n--- Sheet: ' + n + ' ---\n' + XLSX.utils.sheet_to_csv(wb.Sheets[n]); });
-      data.parsedTabular.push({ name: f.name, text: text.slice(0, 60000) });
-      markChipParsed(f.name);
-    } catch (err) {
-      const ext = (f.name.split('.').pop() || '').toLowerCase();
-      if (ext === 'csv') {
-        const tr = new FileReader();
-        tr.onload = ev => { data.parsedTabular.push({ name: f.name, text: String(ev.target.result).slice(0, 60000) }); markChipParsed(f.name); };
-        tr.readAsText(f);
-      }
-    }
-  };
-  r.readAsArrayBuffer(f);
-}
-function markChipParsed(name){
-  document.querySelectorAll('#fileChips .file-chip').forEach(c => { if (c.dataset.name === name) c.classList.add('parsed'); });
 }
 function renderChips() {
   document.getElementById('fileChips').innerHTML = data.files.map((f, i) => {
@@ -1273,8 +1251,7 @@ async function submitAll() {
     data.surcharge       ? 'Surcharges customers: ' + (LABELS.surcharge[data.surcharge]||data.surcharge) : '',
     goalStr              ? 'Primary goal(s): ' + goalStr : '',
     data.pain            ? 'Biggest frustration: ' + data.pain : '',
-    data.skippedUpload   ? 'Statements: not uploaded' : 'Statements uploaded: ' + data.files.length + ' file(s)' +
-                            (data.parsedTabular.length ? ' (' + data.parsedTabular.length + ' spreadsheet export(s) parsed inline)' : '')
+    data.skippedUpload   ? 'Statements: not uploaded' : 'Statements uploaded: ' + data.files.length + ' file(s)'
   ].filter(Boolean).join('\n');
  
   // FACTUAL extraction only. Keep this lean — the generate-report step adds all
@@ -1318,10 +1295,7 @@ RULES:
           content.push({ type:'image', source:{ type:'base64', media_type:mt, data:b64 } });
         }
       }
-      data.parsedTabular.forEach(t => {
-        content.push({ type:'text', text:'Spreadsheet export "' + t.name + '" (CSV):\n' + t.text });
-      });
-      content.push({ type:'text', text:'Analyse these merchant statements and exports.' + suffix });
+      content.push({ type:'text', text:'Analyse these merchant statements.' + suffix });
     } else {
       content = [{ type:'text', text:'No statements uploaded. Analyse based on the merchant profile only.' + suffix }];
     }
@@ -1330,7 +1304,11 @@ RULES:
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system, messages: [{ role: 'user', content }] })
     }, 90000);
-    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error((e && e.error && e.error.message) || ('API error ' + res.status)); }
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      const msg = e.detail || (e.error && e.error.message) || e.error || ('API error ' + res.status);
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
 
     const apiData = await res.json();
     const rawText = (apiData.content.find(b => b.type === 'text')?.text || '');
