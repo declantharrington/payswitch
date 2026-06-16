@@ -1383,6 +1383,43 @@ h3,
   padding: 70px 0 30px;
 }
  
+  /* ============================================================
+     MOBILE OPTIMISATION LAYER
+     Appended last so it wins the cascade. Every rule below is
+     scoped to phone/tablet widths, so the desktop layout above is
+     left completely untouched.
+     ============================================================ */
+  @media (max-width: 860px) {
+    /* Stop any stray wide element (hero device, outro glow, report
+       preview) from causing horizontal scroll / sideways shift.
+       Safe here: the pin engine is already position:relative at
+       this width, so this doesn't break sticky behaviour. */
+    html, body { overflow-x: hidden; }
+
+    /* The report-preview phone keeps its desktop 480px on mobile
+       because the .img-phone class out-specifies the existing
+       mobile override (.report-visual .phone). Pin it back down so
+       it fits the screen. */
+    .report-visual .phone.img-phone { width: min(200px, 54vw); }
+  }
+
+  @media (max-width: 768px) {
+    /* The hero's previous mobile rules targeted .hero-headline-wrap
+       and .static-image-wrap, which no longer exist in the markup,
+       so the current hero received no mobile treatment at all. Give
+       it proper phone spacing and let the device preview stack
+       beneath the copy instead of floating absolutely off the right
+       edge (where it overlapped text and pushed past the viewport). */
+    .hero-section { padding: 104px 20px 56px; min-height: auto; }
+    .hero-content { margin-left: 0; max-width: 100%; }
+    .hero-device-wrap {
+      position: static;
+      right: auto;
+      bottom: auto;
+      width: min(440px, 88vw);
+      margin: 36px auto 0;
+    }
+  }
 </style>
 </head>
 <body>
