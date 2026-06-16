@@ -354,26 +354,54 @@ input#fileInput { display: none; }
 
 @media (max-width: 600px) {
   .chrome {
-    padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: 16px;
-    padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right));
+    padding-top: calc(14px + env(safe-area-inset-top)); padding-bottom: 14px;
+    padding-left: max(22px, env(safe-area-inset-left)); padding-right: max(22px, env(safe-area-inset-right));
   }
-  .progress-wrap { min-width: 110px; }
+  .progress-wrap { min-width: 96px; }
   .progress-label { display: none; }
+
+  /* Top-align the step and clear the fixed header. Vertical-centering
+     jammed tall steps against the header and pushed the button below
+     the fold; top-aligning keeps the title, options and button all in
+     view on one screen. */
   .stage {
-    padding-top: calc(72px + env(safe-area-inset-top)); padding-bottom: calc(72px + env(safe-area-inset-bottom));
-    padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right));
+    align-items: flex-start;
+    padding-top: calc(82px + env(safe-area-inset-top));
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    padding-left: 0; padding-right: 0;
   }
-  /* Phones scroll rather than scale, so tap targets stay full size */
+
+  /* .screen is position:absolute, so the stage's side padding never
+     inset it — that's why titles and cards ran edge to edge. Give the
+     screen its own gutters. */
   .screen {
     --fit: 1 !important;
-    max-height: calc(100dvh - 132px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    padding-left: max(22px, env(safe-area-inset-left));
+    padding-right: max(22px, env(safe-area-inset-right));
+    max-height: calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     overflow-y: auto; overflow-x: hidden;
   }
-  .back-btn { left: max(20px, env(safe-area-inset-left)); bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+  /* Compact, deliberate spacing so the whole step fits without scroll */
+  .q-text { font-size: 28px; margin-bottom: 6px; }
+  .q-sub  { font-size: 14px; margin-bottom: 16px; }
+  .choice-grid { gap: 8px; margin-bottom: 16px; }
+  .choice { padding: 12px 15px; border-radius: 12px; gap: 12px; }
+  .choice-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .choice-label { font-size: 15px; }
+  .choice-sub { font-size: 12px; line-height: 1.4; }
+
+  /* Full-width primary button: a clear tap target that always sits in
+     view, above the back control. */
+  .cta-row { width: 100%; margin-top: 4px; }
+  .cta { width: 100%; justify-content: center; padding: 14px 24px; }
+
+  .back-btn { left: max(22px, env(safe-area-inset-left)); bottom: calc(16px + env(safe-area-inset-bottom)); }
   .key-hint { display: none; }
   .choice-grid.cols-2 { grid-template-columns: 1fr; }
   .otp-digit { width: 44px; height: 56px; font-size: 24px; }
-  .upload-zone { padding: 40px 20px; }
+  .upload-zone { padding: 32px 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
