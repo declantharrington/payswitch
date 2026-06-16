@@ -1393,6 +1393,10 @@ h3,
      state (the scrub math is unreliable once pins go relative),
      tighten type and spacing, and trim the longest copy.
      ============================================================ */
+  /* Mobile-only structural label for the report scene; hidden on
+     desktop so the desktop layout is unchanged. */
+  .scene-eyebrow { display: none; }
+
   @media (max-width: 860px) {
     /* No sideways scroll from any oversized/decorative element. Safe
        here: the pin engine already runs as position:relative. */
@@ -1426,6 +1430,11 @@ h3,
     .scene-report { padding: 60px 22px 52px; margin-top: 0; }
     .report-visual { display: none; }
     .report-stage { gap: 0; }
+    .scene-eyebrow {
+      display: block; font-size: 12px; font-weight: 600;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--mut2); margin: 0 0 14px;
+    }
     .report-copy .scene-h {
       font-size: clamp(26px, 7.2vw, 31px);
       line-height: 1.1; max-width: 100%;
@@ -1562,6 +1571,7 @@ h3,
  </div> 
        
       <div class="report-copy">
+        <p class="scene-eyebrow">The report</p>
         <h2 class="scene-h">A consulting-grade review. Generated in minutes.</h2>
         <p class="scene-sub">From messy statements to clear actions<span class="m-hide"> — executive summary, pricing review, provider benchmark, routing opportunity, acceptance analysis, fraud observations, next steps</span>.</p>
       </div>
