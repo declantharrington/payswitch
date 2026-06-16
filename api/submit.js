@@ -124,6 +124,31 @@ export default async function handler(req, res) {
     const fmtD = n => n != null ? '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
     const fmtP = n => n != null ? Number(n).toFixed(2) + '%' : '—';
 
+    // ── Fee reconciliation guard ──────────────────────────────────
+    // totalFees should be the statement's stated (GST-inclusive) total. When a
+    // feeBreakdown is present, its components should sum to ~totalFees. A
+    // material gap usually means an extraction error (e.g. a GST-exclusive
+    // figure was used, or a fee block was missed) — surface it for the admin to
+    // check BEFORE approving and generating the report.
+    const FEE_RECONCILE_TOLERANCE_PCT = 5;
+    const feeCheck = (() => {
+      const total = Number(report.totalFees);
+      const items = Array.isArray(report.feeBreakdown) ? report.feeBreakdown : [];
+      if (!total || !items.length) return null; // nothing to reconcile
+      const sum = items.reduce((a, b) => a + (Number(b.amount) || 0), 0);
+      const pct = Math.abs(sum - total) / total * 100;
+      return { total, sum, diff: sum - total, pct, ok: pct <= FEE_RECONCILE_TOLERANCE_PCT };
+    })();
+    if (feeCheck && !feeCheck.ok) {
+      console.warn(`submit: fee reconciliation mismatch — breakdown ${feeCheck.sum.toFixed(2)} vs totalFees ${feeCheck.total.toFixed(2)} (${feeCheck.pct.toFixed(1)}%)`);
+    }
+    const reconWarningHtml = (feeCheck && !feeCheck.ok)
+      ? `<div style="margin:0 0 8px;padding:12px 14px;border-radius:8px;background:#fdecea;border:1px solid #f5b5ae">
+           <strong style="display:block;font-size:13px;color:#a3271b;margin-bottom:3px">⚠ Fee reconciliation check</strong>
+           <span style="font-size:13px;color:#7a2018;line-height:1.55">Extracted total fees (${fmtD(feeCheck.total)}) differ from the sum of the fee breakdown (${fmtD(feeCheck.sum)}) by ${fmtD(Math.abs(feeCheck.diff))} (${feeCheck.pct.toFixed(1)}%). Verify the statement's stated total before approving.</span>
+         </div>`
+      : '';
+
     // The analyser now returns FACTS only (no prose/findings — those are added at
     // report-generation time). The triage email reflects those facts.
     const observationsHtml = Array.isArray(report.observations) && report.observations.length
@@ -202,12 +227,14 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 <div class="body">
+  ${reconWarningHtml}
   <div class="section">
     <div class="sec-label">Statement Data (extracted)</div>
     <table>
       <tr><td>Card volume</td><td>${fmtD(report.volume)}</td></tr>
       <tr><td>Total fees</td><td>${fmtD(report.totalFees)}</td></tr>
       <tr><td>Effective rate</td><td>${fmtP(report.effectiveRate)}</td></tr>
+      <tr><td>Provider rate / margin</td><td>${report.providerRate || '—'}</td></tr>
       <tr><td>Transactions</td><td>${report.transactions != null ? Number(report.transactions).toLocaleString('en-AU') : '—'}</td></tr>
       <tr><td>Avg transaction value</td><td>${fmtD(report.averageTransactionValue)}</td></tr>
       <tr><td>Monthly fee</td><td>${fmtD(report.monthlyFee)}</td></tr>
