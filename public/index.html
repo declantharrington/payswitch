@@ -1384,41 +1384,73 @@ h3,
 }
  
   /* ============================================================
-     MOBILE OPTIMISATION LAYER
-     Appended last so it wins the cascade. Every rule below is
-     scoped to phone/tablet widths, so the desktop layout above is
-     left completely untouched.
+     MOBILE OPTIMISATION LAYER  (premium pass)
+     Appended last so it wins the cascade. Every rule is scoped to
+     phone/tablet widths — the desktop layout above is untouched.
+     Goal: a clean, minimal, premium vertical flow. We remove the
+     scattered desktop device mockups (which cut off in corners on
+     small screens), force scroll-scrubbed content to its final
+     state (the scrub math is unreliable once pins go relative),
+     tighten type and spacing, and trim the longest copy.
      ============================================================ */
   @media (max-width: 860px) {
-    /* Stop any stray wide element (hero device, outro glow, report
-       preview) from causing horizontal scroll / sideways shift.
-       Safe here: the pin engine is already position:relative at
-       this width, so this doesn't break sticky behaviour. */
+    /* No sideways scroll from any oversized/decorative element. Safe
+       here: the pin engine already runs as position:relative. */
     html, body { overflow-x: hidden; }
 
-    /* The report-preview phone keeps its desktop 480px on mobile
-       because the .img-phone class out-specifies the existing
-       mobile override (.report-visual .phone). Pin it back down so
-       it fits the screen. */
-    .report-visual .phone.img-phone { width: min(200px, 54vw); }
+    /* Land every scroll-scrubbed section at its finished, fully
+       visible state instead of part-way through a scroll-tied fade
+       or translate. This is the same end-state reduced-motion uses. */
+    [data-scrub] { --p: 1 !important; }
+
+    /* The generic `.pin .pin-inner { min-height: 100vh }` is declared
+       AFTER the earlier mobile rules in the source, so it was forcing
+       every scene to full-viewport height with vertically-centred
+       content — the big empty gaps. Collapse it to content height. */
+    .pin .pin-inner { min-height: 0; align-content: start; }
   }
 
   @media (max-width: 768px) {
-    /* The hero's previous mobile rules targeted .hero-headline-wrap
-       and .static-image-wrap, which no longer exist in the markup,
-       so the current hero received no mobile treatment at all. Give
-       it proper phone spacing and let the device preview stack
-       beneath the copy instead of floating absolutely off the right
-       edge (where it overlapped text and pushed past the viewport). */
+    /* ---------- HERO ---------- (the stacked layout reads well; keep) */
     .hero-section { padding: 104px 20px 56px; min-height: auto; }
     .hero-content { margin-left: 0; max-width: 100%; }
     .hero-device-wrap {
-      position: static;
-      right: auto;
-      bottom: auto;
-      width: min(440px, 88vw);
-      margin: 36px auto 0;
+      position: static; right: auto; bottom: auto;
+      width: min(440px, 88vw); margin: 36px auto 0;
     }
+
+    /* ---------- REPORT SCENE ----------
+       Drop the laptop + phone mockups: on mobile they scatter into
+       the corners and cut off, and the product is already shown in
+       the hero and the gallery. Leave a clean, centred text moment. */
+    .scene-report { padding: 60px 22px 52px; margin-top: 0; }
+    .report-visual { display: none; }
+    .report-stage { gap: 0; }
+    .report-copy .scene-h {
+      font-size: clamp(26px, 7.2vw, 31px);
+      line-height: 1.1; max-width: 100%;
+    }
+    .report-copy .scene-sub {
+      font-size: 16px; line-height: 1.6; margin-bottom: 0;
+      color: rgba(214,222,245,0.72);   /* lift from the faint 0.55 */
+      max-width: 38ch;
+    }
+    .scene-sub .m-hide { display: none; }   /* trims the long fee list */
+
+    /* ---------- GALLERY ---------- tighten heading + kill the dead gap */
+    .scene-gallery { margin-top: 0; }
+    .scene-gallery .pin-inner { padding: 36px 0 22px; }
+    .gal-head { margin: 0 0 22px; padding-left: 22px; padding-right: 22px; }
+    .gal-head h2 { font-size: clamp(25px, 7vw, 31px); max-width: 18ch; }
+    .gal-head p { font-size: 12px; }
+    .gal-track { padding: 0 22px; gap: 16px; }
+
+    /* ---------- OUTRO ---------- kill the duplicate 'gateway' ghost */
+    .outro-section { padding: 60px 22px 92px; min-height: auto; }
+    .outro-headline { font-size: clamp(33px, 9.5vw, 46px); margin-bottom: 40px; }
+    /* The hard 0 22px offset shadow rendered as a second, ghosted
+       word at mobile sizes — keep only the soft glow. */
+    .cycler-word { text-shadow: 0 0 26px rgba(58,138,255,0.32); }
   }
 </style>
 </head>
@@ -1531,7 +1563,7 @@ h3,
        
       <div class="report-copy">
         <h2 class="scene-h">A consulting-grade review. Generated in minutes.</h2>
-        <p class="scene-sub">From messy statements to clear actions — executive summary, pricing review, provider benchmark, routing opportunity, acceptance analysis, fraud observations, next steps.</p>
+        <p class="scene-sub">From messy statements to clear actions<span class="m-hide"> — executive summary, pricing review, provider benchmark, routing opportunity, acceptance analysis, fraud observations, next steps</span>.</p>
       </div>
     </div>
   </div>
