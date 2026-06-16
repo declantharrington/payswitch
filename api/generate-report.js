@@ -132,6 +132,13 @@ Use ONLY these figures for any market/landscape statistic. Do NOT invent or esti
 - Any fixed/interchange per-transaction fee, if you mention one, is quoted in CENTS. Never conflate the two.
 - Interchange, scheme fees and the acquirer's margin are three different things paid to three different parties — don't merge them.
 
+═══ PROVIDER RATE vs EFFECTIVE RATE ═══
+- "Provider rate / margin" is what the merchant's PROVIDER charges them: on interchange-plus / interchange-plus-plus this is the acquirer's margin (often the same flat rate on debit and credit); on blended/single-rate it is the blended rate(s). The effective rate is the ALL-IN cost (provider margin + interchange + scheme fees) as a share of turnover.
+- When both are available, help the merchant see the difference plainly: the provider margin is the part their provider sets (and the more negotiable piece), while the effective rate is what they actually pay all-in once wholesale interchange and scheme fees are added. Do not present the provider rate as the total cost, nor the effective rate as the provider's charge.
+
+═══ CARD MIX — do not misread ═══
+- Rely only on the card mix provided to you. NEVER state or imply the merchant has no debit volume, or that everything is "processed as credit", based on a summary or deposit column — debit and credit splits come from the interchange/scheme breakdown, and a merchant can be debit-heavy even when a summary lumps volume under "credit".
+
 ═══ FORMATTING RULES ═══
 - Use "\\n\\n" between paragraphs (double newline).
 - For multi-point sections, use "**Heading:** Content" with double newlines between each block.
@@ -164,6 +171,20 @@ DERIVING alerts AND stackItems:
 - Produce 3 to 5 "stackItems" describing the merchant's current setup component-by-component. Assign "status" by comparing each component to the Knowledge Base benchmarks: ok = in line with or better than typical, warn = worth a closer look, gap = a clear shortfall or missed opportunity. The "value" must be factual (from the provided facts); the status is your judgement.`;
 
     const facts = report; // the analyser now returns facts only
+
+    // Fee reconciliation (log-only safety net). totalFees should be the
+    // statement's stated GST-inclusive total; if a feeBreakdown is present it
+    // should sum to ~totalFees. A material gap is logged so a bad extraction is
+    // visible at generation time (submit.js flags it visibly pre-approval).
+    (() => {
+      const total = Number(facts.totalFees);
+      const items = Array.isArray(facts.feeBreakdown) ? facts.feeBreakdown : [];
+      if (!total || !items.length) return;
+      const sum = items.reduce((a, b) => a + (Number(b.amount) || 0), 0);
+      const pct = Math.abs(sum - total) / total * 100;
+      if (pct > 5) console.warn(`generate-report: fee reconciliation mismatch — breakdown ${sum.toFixed(2)} vs totalFees ${total.toFixed(2)} (${pct.toFixed(1)}%).`);
+    })();
+
     const cardMix = facts.cardMix || {};
     const cardMixStr = Object.entries(cardMix)
       .filter(([, v]) => v != null)
@@ -194,6 +215,7 @@ Monthly fee: ${fmtD(facts.monthlyFee)}
 Terminal fees: ${fmtD(facts.terminalFees)}
 Fixed per-transaction fee (if any): ${facts.perTransactionFee != null ? facts.perTransactionFee + 'c' : '—'}
 Pricing model (observed): ${facts.pricingModel || '—'}
+Provider rate / margin (observed): ${facts.providerRate || '—'}
 LCR status (observed): ${facts.lcrStatus || '—'}
 Card mix: ${cardMixStr}
 
@@ -301,6 +323,7 @@ ${programContext}`;
       '{{provider}}':               report.provider || '—',
       '{{period}}':                 report.period || '—',
       '{{effective_rate}}':         fmtP(report.effectiveRate),
+      '{{provider_rate}}':          report.providerRate || '—',
       '{{total_fees}}':             fmtD(report.totalFees),
       '{{volume}}':                 fmtD(report.volume),
       '{{merchant_name}}':          merchantName,
@@ -851,6 +874,7 @@ body {
         <thead><tr><th style="width:42%">Component</th><th>Value</th></tr></thead>
         <tbody>
           <tr><td class="td-label">Effective rate</td><td class="td-value">{{effective_rate}}</td></tr>
+          <tr><td class="td-label">Provider rate / margin</td><td class="td-value">{{provider_rate}}</td></tr>
           <tr><td class="td-label">Total fees paid</td><td class="td-value">{{total_fees}}</td></tr>
           <tr><td class="td-label">Card volume processed</td><td class="td-value">{{volume}}</td></tr>
           <tr><td class="td-label">Total transactions</td><td class="td-value">{{transactions}}</td></tr>
